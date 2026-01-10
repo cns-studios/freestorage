@@ -121,9 +121,9 @@
     </div>
 
     <script>
-        const USERDATA_URL = 'http://localhost:3001';
-        const CONTENT_URL = 'http://localhost:3003';
-        const WS_URL = 'ws://localhost:3002';
+        const USERDATA_URL = window.location.origin + '/api/userdata-server';
+        const CONTENT_URL = window.location.origin + '/api/content-server';
+        const WS_URL = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/api/content-server-ws';
 
         let ws = null;
         let currentUser = {};

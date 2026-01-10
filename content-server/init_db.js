@@ -1,5 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
-const db = new sqlite3.Database('./content.db');
+const fs = require('fs');
+if (!fs.existsSync('./data')) fs.mkdirSync('./data');
+const db = new sqlite3.Database('./data/content.db');
 
 db.serialize(() => {
   db.run('PRAGMA journal_mode=WAL;');

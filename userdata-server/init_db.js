@@ -1,5 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
-const db = new sqlite3.Database('./userdata.db');
+const fs = require('fs');
+if (!fs.existsSync('./data')) fs.mkdirSync('./data');
+const db = new sqlite3.Database('./data/userdata.db');
 
 db.serialize(() => {
   // Enable WAL mode

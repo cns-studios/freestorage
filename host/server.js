@@ -3,7 +3,8 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 
 const app = express();
-const PORT = 3005;
+const PORT = process.env.PORT || 8087;
+const USERDATA_SERVER_URL = process.env.USERDATA_SERVER_URL || 'http://localhost:8086';
 
 app.use(express.json());
 app.use(cookieParser());
@@ -19,7 +20,7 @@ app.get('/download-app', (req, res) => {
 // Proxy login to userdata-server and set cookies
 app.post('/api/login', async (req, res) => {
     try {
-        const response = await fetch('http://localhost:3001/login', {
+        const response = await fetch(`${USERDATA_SERVER_URL}/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(req.body)

@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const suffix = process.argv[2] || '';
 const STORAGE_DIR = path.join(__dirname, `storage${suffix}`);
 const CREDENTIALS_PATH = path.join(__dirname, `credentials${suffix}.json`);
-const WS_URL = 'ws://localhost:3002';
+const WS_URL = process.env.WS_URL || 'ws://localhost:3002';
 
 // Ensure storage directory exists
 if (!fs.existsSync(STORAGE_DIR)) {

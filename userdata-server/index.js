@@ -5,7 +5,9 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
 const app = express();
-const db = new sqlite3.Database('./userdata.db');
+const fs = require('fs');
+if (!fs.existsSync('./data')) fs.mkdirSync('./data');
+const db = new sqlite3.Database('./data/userdata.db');
 
 db.run('PRAGMA journal_mode=WAL;');
 
@@ -263,5 +265,5 @@ app.get('/profile', authenticateToken, (req, res) => {
     });
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 8086;
 app.listen(PORT, () => log('INFO', null, `Userdata server running on port ${PORT}`));

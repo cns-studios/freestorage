@@ -1,0 +1,39 @@
+services:
+  userdata-server:
+    build:
+      context: ./userdata-server
+    container_name: freestorage-userdata-server
+    ports:
+      - "8086:8086"
+    volumes:
+      - ./userdata-server/data:/app/data
+    environment:
+      - PORT=8086
+
+  content-server:
+    build:
+      context: ./content-server
+    container_name: freestorage-content-server
+    ports:
+      - "8085:8085"
+      - "3002:3002"
+    volumes:
+      - ./content-server/data:/app/data
+    environment:
+      - HTTP_PORT=8085
+      - WS_PORT=3002
+      - USERDATA_SERVER_URL=http://userdata-server:8086
+    depends_on:
+      - userdata-server
+
+  host:
+    build:
+      context: ./host
+    container_name: freestorage-host-server
+    ports:
+      - "8087:8087"
+    environment:
+      - PORT=8087
+      - USERDATA_SERVER_URL=http://userdata-server:8086
+    depends_on:
+      - userdata-server
