@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FreeStorage // Privacy Policy</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Inter:wght@100..900&display=swap');
+        :root {
+            --bg-color: #000000;
+            --text-primary: #ededed;
+            --text-secondary: #888888;
+            --text-tertiary: #444444;
+            --border-color: #333333;
+            --card-color: #0a0a0a;
+        }
+        body {
+            margin: 0; padding: 4rem 2rem;
+            font-family: 'Geist', 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-secondary);
+            line-height: 1.6;
+            display: flex;
+            justify-content: center;
+        }
+        .container { max-width: 700px; }
+        h1, h2, h3 { color: var(--text-primary); letter-spacing: -0.02em; }
+        .sect { margin-bottom: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 2rem; }
+        .sect b { color: var(--text-primary); display: block; margin-bottom: 0.5rem; }
+        a { color: var(--text-primary); text-decoration: none; border-bottom: 1px solid var(--text-tertiary); }
+        .back-link { margin-bottom: 2rem; display: inline-block; font-size: 0.875rem; color: var(--text-tertiary); border: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Home</a>
+        <h1>Privacy Policy</h1>
+        <p>Last Updated: January 10, 2026</p>
+
+        <div class="sect">
+            <b>1. INFORMATION WE COLLECT</b>
+            <p>We collect minimal information required to operate the network, including:
+                <ul>
+                    <li>Account information: Username and hashed passwords.</li>
+                    <li>Technical data: IP addresses, "last seen" timestamps, and PeerIDs.</li>
+                    <li>Storage metadata: File names, sizes, and chunk hashes.</li>
+                </ul>
+            </p>
+        </div>
+
+        <div class="sect">
+            <b>2. DATA DISTRIBUTION</b>
+            <p>Files uploaded to FreeStorage are encrypted on the client side, split into chunks, and distributed across multiple peer nodes (bots). While data is encrypted, technical identifiers may be visible to peer operators as part of the normal operation of the distributed network.</p>
+        </div>
+
+        <div class="sect">
+            <b>3. DATA RETENTION</b>
+            <p>We retain your information as long as your account is active. However, as per our Terms of Service, we do not guarantee the permanent storage of any data and may purge metadata or account records at our discretion.</p>
+        </div>
+
+        <div class="sect">
+            <b>4. COOKIES</b>
+            <p>We use essential cookies to maintain your login session. These are necessary for the functionality of the web interface.</p>
+        </div>
+
+        <div class="sect">
+            <b>5. SECURITY</b>
+            <p>While we use encryption for data at rest (on peers) and in transit, no method of transmission or electronic storage is 100% secure. You use the service at your own risk.</p>
+        </div>
+
+        <div class="sect">
+            <b>6. CONTACT</b>
+            <p>If you have questions regarding your data, please contact the network administrators via the official community channels.</p>
+        </div>
+    </div>
+</body>
+</html>
