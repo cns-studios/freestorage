@@ -11,9 +11,11 @@ db.serialize(() => {
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       encryption_key_encrypted TEXT NOT NULL,
+      peer_secret TEXT NOT NULL,
       storage_limit_gb INTEGER DEFAULT 10,
       storage_used_gb REAL DEFAULT 0,
       total_online_minutes INTEGER DEFAULT 0,
+      chunks_stored INTEGER DEFAULT 0,
       last_ping_time INTEGER,
       created_at INTEGER DEFAULT (strftime('%s', 'now'))
     )

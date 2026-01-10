@@ -1,6 +1,7 @@
 const WebSocket = require('ws');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const suffix = process.argv[2] || '';
 const STORAGE_DIR = path.join(__dirname, `storage${suffix}`);
@@ -12,23 +13,27 @@ if (!fs.existsSync(STORAGE_DIR)) {
     fs.mkdirSync(STORAGE_DIR, { recursive: true });
 }
 
-function getUserId() {
+function getCredentials() {
     if (fs.existsSync(CREDENTIALS_PATH)) {
         try {
             const data = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
-            if (data.userId) return data.userId;
+            if (data.userId && data.peerSecret) return data;
         } catch (e) {
             console.error('Error reading credentials file:', e.message);
         }
     }
 
-    // Generate a random UserID (High range to avoid collision with real users)
+    // Generate a random UserID and PeerSecret
     const newUserId = Math.floor(Math.random() * 9000000) + 1000000;
-    fs.writeFileSync(CREDENTIALS_PATH, JSON.stringify({ userId: newUserId }, null, 2));
-    return newUserId;
+    const newPeerSecret = crypto.randomBytes(32).toString('hex');
+    const creds = { userId: newUserId, peerSecret: newPeerSecret };
+    fs.writeFileSync(CREDENTIALS_PATH, JSON.stringify(creds, null, 2));
+    return creds;
 }
 
-const userId = getUserId();
+const credentials = getCredentials();
+const userId = credentials.userId;
+const peerSecret = credentials.peerSecret;
 console.log(`Bot${suffix} starting with UserID: ${userId}`);
 console.log(`Using storage: ${STORAGE_DIR}`);
 
@@ -65,7 +70,7 @@ function connect() {
 
 function authenticate() {
     if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'auth', userId }));
+        ws.send(JSON.stringify({ type: 'auth', userId, peerSecret }));
         console.log('Sent authentication');
     }
 }
@@ -137,6 +142,15 @@ function handleRetrieveChunk(msg) {
         }
     } else {
         console.log(`Requested chunk not found: ${chunkId}`);
+        if (myPeerId) {
+            ws.send(JSON.stringify({
+                type: 'chunk_missing',
+                chunkId: chunkId,
+                peerId: myPeerId,
+                requestId: requestId,
+                purpose: purpose
+            }));
+        }
     }
 }
 

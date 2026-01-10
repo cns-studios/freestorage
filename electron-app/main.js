@@ -158,7 +158,10 @@ ipcMain.handle('upload-file', async (event, { filePath, relativePath }) => {
         
         const initResponse = await fetch(`${CONTENT_URL}/upload/init`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${userData.token}`
+            },
             body: JSON.stringify({
                 userId: userData.userId,
                 filename: filename,
@@ -210,7 +213,10 @@ ipcMain.handle('update-account', async (event, updates) => {
 ipcMain.handle('delete-account', async (event) => {
     log('WARN', 'DELETE_ACCOUNT', 'Initiating account deletion');
     try {
-        await fetch(`${CONTENT_URL}/files/user/${userData.userId}/all`, { method: 'DELETE' });
+        await fetch(`${CONTENT_URL}/files/user/${userData.userId}/all`, { 
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${userData.token}` }
+        });
         
         const response = await fetch(`${USERDATA_URL}/user`, {
             method: 'DELETE',
@@ -227,7 +233,10 @@ ipcMain.handle('delete-account', async (event) => {
 ipcMain.handle('delete-all-files', async (event, userId) => {
     log('WARN', 'DELETE_ALL_FILES', 'Deleting all files');
     try {
-        const response = await fetch(`${CONTENT_URL}/files/user/${userId}/all`, { method: 'DELETE' });
+        const response = await fetch(`${CONTENT_URL}/files/user/${userId}/all`, { 
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${userData.token}` }
+        });
         log('INFO', 'DELETE_ALL_FILES', 'All files deleted');
         return await response.json();
     } catch (e) {
@@ -241,7 +250,9 @@ ipcMain.handle('download-file', async (event, fileId) => {
     log('INFO', 'DOWNLOAD', `Starting download: ${fileId}`);
 
     try {
-        const response = await fetch(`${CONTENT_URL}/download/${fileId}`);
+        const response = await fetch(`${CONTENT_URL}/download/${fileId}`, {
+            headers: { 'Authorization': `Bearer ${userData.token}` }
+        });
         const { chunks } = await response.json();
         if (!chunks || chunks.length === 0) throw new Error('File not found or no chunks');
 
@@ -249,19 +260,27 @@ ipcMain.handle('download-file', async (event, fileId) => {
         
         for (const chunk of chunks) {
             const localPath = path.join(CHUNK_STORAGE_PATH, chunk.chunkId);
+            let chunkBuffer;
+            
             if (fs.existsSync(localPath)) {
-                chunkBuffers.push(fs.readFileSync(localPath));
-                continue;
+                chunkBuffer = fs.readFileSync(localPath);
+            } else {
+                try {
+                    chunkBuffer = await requestChunk(chunk.chunkId);
+                } catch (err) {
+                    log('ERROR', 'DOWNLOAD', `Chunk retrieval failed: ${chunk.chunkId}`);
+                    throw new Error(`Failed to retrieve chunk ${chunk.chunkIndex}`);
+                }
             }
 
-            try {
-                const chunkData = await requestChunk(chunk.chunkId);
-                chunkBuffers.push(chunkData);
-            } catch (err) {
-                log('ERROR', 'DOWNLOAD', `Chunk retrieval failed: ${chunk.chunkId}`);
-                console.error(`Failed to retrieve chunk ${chunk.chunkId}`, err);
-                throw new Error(`Failed to retrieve chunk ${chunk.chunkIndex}`);
+            // Verify integrity
+            const actualHash = hashChunk(chunkBuffer);
+            if (actualHash !== chunk.chunkHash) {
+                log('ERROR', 'DOWNLOAD', `Integrity check failed for chunk ${chunk.chunkId}`);
+                throw new Error(`Integrity check failed for chunk ${chunk.chunkIndex}`);
             }
+            
+            chunkBuffers.push(chunkBuffer);
         }
         
         const fullEncrypted = Buffer.concat(chunkBuffers);
@@ -281,7 +300,9 @@ ipcMain.handle('download-file', async (event, fileId) => {
 
 ipcMain.handle('get-files', async (event, userId) => {
     try {
-        const response = await fetch(`${CONTENT_URL}/files/user/${userId}`);
+        const response = await fetch(`${CONTENT_URL}/files/user/${userId}`, {
+            headers: { 'Authorization': `Bearer ${userData.token}` }
+        });
         const data = await response.json();
         return data; 
     } catch (e) {
@@ -293,7 +314,8 @@ ipcMain.handle('delete-file', async (event, fileId) => {
     log('INFO', 'DELETE_FILE', `Deleting file: ${fileId}`);
     try {
         const response = await fetch(`${CONTENT_URL}/files/${fileId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${userData.token}` }
         });
         const data = await response.json();
         if (data.success) return { success: true };
@@ -360,7 +382,7 @@ function connectToContentServer(userId) {
     ws = new WebSocket(WS_URL);
     
     ws.on('open', () => {
-        ws.send(JSON.stringify({ type: 'auth', userId }));
+        ws.send(JSON.stringify({ type: 'auth', userId, peerSecret: userData.peerSecret }));
         log('INFO', 'WS', 'Connected to content server');
     });
     
@@ -393,6 +415,17 @@ function connectToContentServer(userId) {
                         purpose: msg.purpose
                     }));
                     log('DEBUG', 'WS', `Served chunk request: ${msg.chunkId}`);
+                } else {
+                    log('WARN', 'WS', `Requested chunk missing: ${msg.chunkId}`);
+                    if (userData.peerId) {
+                        ws.send(JSON.stringify({
+                            type: 'chunk_missing',
+                            chunkId: msg.chunkId,
+                            peerId: userData.peerId,
+                            requestId: msg.requestId,
+                            purpose: msg.purpose
+                        }));
+                    }
                 }
             }
             

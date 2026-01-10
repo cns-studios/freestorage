@@ -2,9 +2,13 @@ const express = require('express');
 const WebSocket = require('ws');
 const sqlite3 = require('sqlite3');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const db = new sqlite3.Database('./content.db');
+
+const SECRET_KEY = 'YOUR_SUPER_SECRET_KEY';
+const INTERNAL_API_KEY = 'YOUR_INTERNAL_SERVICE_KEY';
 
 db.run('PRAGMA journal_mode=WAL;');
 
@@ -16,6 +20,17 @@ const HTTP_PORT = 3003;
 
 const wss = new WebSocket.Server({ port: WS_PORT });
 const activePeers = new Map();
+
+function authenticateToken(req, res, next) {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'No token' });
+    
+    jwt.verify(token, SECRET_KEY, (err, decoded) => {
+        if (err) return res.status(403).json({ error: 'Invalid token' });
+        req.userId = decoded.userId;
+        next();
+    });
+}
 
 function getIp(reqOrWs) {
     if (reqOrWs.connection) return reqOrWs.ip || reqOrWs.connection.remoteAddress || 'unknown';
@@ -45,32 +60,47 @@ wss.on('connection', (ws, req) => {
             const msg = JSON.parse(data);
             
             if (msg.type === 'auth') {
-                db.run(
-                    `INSERT INTO peers (user_id, online, last_seen, websocket_id) 
-                     VALUES (?, 1, ?, ?)
-                     ON CONFLICT(user_id) DO UPDATE SET 
-                        online=1, last_seen=excluded.last_seen, websocket_id=excluded.websocket_id`,
-                    [msg.userId, Math.floor(Date.now() / 1000), wsId],
-                    function(err) {
-                        if (err) {
-                            log('ERROR', ws, `Peer auth error: ${err.message}`);
-                            return;
-                        }
-                        
-                        db.get('SELECT id FROM peers WHERE user_id = ?', [msg.userId], (err, row) => {
-                            if (row) {
-                                activePeers.set(wsId, { ws, userId: msg.userId, peerId: row.id });
-                                ws.send(JSON.stringify({ type: 'auth_ok', peerId: row.id }));
-                                log('INFO', ws, `Peer authenticated: ${msg.userId} (PeerID: ${row.id})`);
-                            }
-                        });
+                const { userId, peerSecret } = msg;
+                if (!userId || !peerSecret) return;
+
+                db.get('SELECT peer_secret FROM peers WHERE user_id = ?', [userId], (err, row) => {
+                    if (row && row.peer_secret && row.peer_secret !== peerSecret) {
+                        log('WARN', ws, `Peer auth failed for userId ${userId}: Invalid secret`);
+                        return;
                     }
-                );
+
+                    db.run(
+                        `INSERT INTO peers (user_id, peer_secret, online, last_seen, websocket_id) 
+                         VALUES (?, ?, 1, ?, ?)
+                         ON CONFLICT(user_id) DO UPDATE SET 
+                            online=1, last_seen=excluded.last_seen, websocket_id=excluded.websocket_id, peer_secret=COALESCE(peer_secret, excluded.peer_secret)`,
+                        [userId, peerSecret, Math.floor(Date.now() / 1000), wsId],
+                        function(err) {
+                            if (err) {
+                                log('ERROR', ws, `Peer auth error: ${err.message}`);
+                                return;
+                            }
+                            
+                            db.get('SELECT id FROM peers WHERE user_id = ?', [userId], (err, row) => {
+                                if (row) {
+                                    activePeers.set(wsId, { ws, userId: userId, peerId: row.id });
+                                    ws.send(JSON.stringify({ type: 'auth_ok', peerId: row.id }));
+                                    log('INFO', ws, `Peer authenticated: ${userId} (PeerID: ${row.id})`);
+                                }
+                            });
+                        }
+                    );
+                });
             }
             
             if (msg.type === 'chunk_stored') {
                 log('DEBUG', ws, `Chunk stored confirmation: ${msg.chunkId} by Peer ${msg.peerId}`);
                 handleChunkStored(msg.chunkId, msg.peerId);
+            }
+
+            if (msg.type === 'chunk_missing') {
+                log('WARN', ws, `Chunk reported missing: ${msg.chunkId} by Peer ${msg.peerId}`);
+                handleChunkMissing(msg.chunkId, msg.peerId, msg.requestId, msg.purpose);
             }
 
             if (msg.type === 'request_chunk') {
@@ -157,8 +187,13 @@ function handleChunkRequest(requesterWsId, chunkId) {
     });
 }
 
-app.post('/upload/init', (req, res) => {
+app.post('/upload/init', authenticateToken, (req, res) => {
     const { userId, filename, fileSize, totalChunks } = req.body;
+
+    if (parseInt(userId) !== req.userId) {
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+
     const fileId = crypto.randomUUID();
     
     db.run(
@@ -223,12 +258,60 @@ function handleChunkStored(chunkId, peerId) {
         [chunkId, peerId],
         (err) => {
             if (err) return; 
+
+            // Increment storage proof for peer
+            db.run('UPDATE peers SET chunks_stored = chunks_stored + 1 WHERE id = ?', [peerId]);
+            
+            // Sync with userdata server
+            db.get('SELECT user_id, chunks_stored FROM peers WHERE id = ?', [peerId], (err, peer) => {
+                if (peer) {
+                    fetch('http://localhost:3001/sync-contribution', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            userId: peer.user_id, 
+                            chunksStored: peer.chunks_stored, 
+                            apiKey: INTERNAL_API_KEY 
+                        })
+                    }).catch(() => {});
+                }
+            });
+
             db.get('SELECT COUNT(*) as count FROM chunk_replicas WHERE chunk_id = ?', [chunkId], (err, row) => {
                 const count = row.count;
                 db.run('UPDATE chunks SET replica_count = ? WHERE id = ?', [count, chunkId]);
                 if (count >= 5) {
                     db.run('UPDATE chunks SET status = "ok" WHERE id = ?', [chunkId]);
                     checkFileCompletion(chunkId);
+                }
+            });
+        }
+    );
+}
+
+function handleChunkMissing(chunkId, peerId, requestId, purpose) {
+    db.run(
+        'DELETE FROM chunk_replicas WHERE chunk_id = ? AND peer_id = ?',
+        [chunkId, peerId],
+        (err) => {
+            if (err) return;
+            db.get('SELECT COUNT(*) as count FROM chunk_replicas WHERE chunk_id = ?', [chunkId], (err, row) => {
+                const count = row.count || 0;
+                db.run('UPDATE chunks SET replica_count = ? WHERE id = ?', [count, chunkId]);
+                log('WARN', null, `Chunk ${chunkId} removed from Peer ${peerId}. New replica count: ${count}`);
+                
+                // If there was an active request, try to find another provider immediately
+                if (requestId) {
+                    if (purpose === 'cache') {
+                        cacheChunkLocally(chunkId);
+                    } else {
+                        handleChunkRequest(requestId, chunkId);
+                    }
+                }
+
+                // If count is low, trigger an attempt to cache and redistribute
+                if (count < 5) {
+                    cacheChunkLocally(chunkId);
                 }
             });
         }
@@ -252,7 +335,7 @@ function checkFileCompletion(chunkId) {
                         fetch('http://localhost:3001/update-storage', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ userId: file.user_id, addGb: sizeGb })
+                            body: JSON.stringify({ userId: file.user_id, addGb: sizeGb, apiKey: INTERNAL_API_KEY })
                         }).catch(e => log('ERROR', null, `Failed to update storage usage: ${e.message}`));
                     }
                 }
@@ -261,13 +344,17 @@ function checkFileCompletion(chunkId) {
     });
 }
 
-app.delete('/files/:fileId', (req, res) => {
+app.delete('/files/:fileId', authenticateToken, (req, res) => {
     const { fileId } = req.params;
     
     db.get('SELECT user_id, file_size_bytes FROM files WHERE id = ?', [fileId], (err, file) => {
         if (!file) {
             log('WARN', req, `Delete failed: File ${fileId} not found`);
             return res.status(404).json({ error: 'File not found' });
+        }
+
+        if (file.user_id !== req.userId) {
+            return res.status(403).json({ error: 'Unauthorized' });
         }
         
         db.run('DELETE FROM chunk_replicas WHERE chunk_id IN (SELECT id FROM chunks WHERE file_id = ?)', [fileId]);
@@ -283,7 +370,7 @@ app.delete('/files/:fileId', (req, res) => {
             fetch('http://localhost:3001/update-storage', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: file.user_id, addGb: -sizeGb })
+                body: JSON.stringify({ userId: file.user_id, addGb: -sizeGb, apiKey: INTERNAL_API_KEY })
             }).catch(e => log('ERROR', null, `Failed to update storage usage: ${e.message}`));
             
             log('INFO', req, `File deleted: ${fileId}`);
@@ -292,9 +379,13 @@ app.delete('/files/:fileId', (req, res) => {
     });
 });
 
-app.delete('/files/user/:userId/all', (req, res) => {
+app.delete('/files/user/:userId/all', authenticateToken, (req, res) => {
     const { userId } = req.params;
     
+    if (parseInt(userId) !== req.userId) {
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+
     db.get('SELECT SUM(file_size_bytes) as total_size FROM files WHERE user_id = ?', [userId], (err, result) => {
         const totalSize = result ? result.total_size : 0;
         
@@ -312,7 +403,7 @@ app.delete('/files/user/:userId/all', (req, res) => {
                 fetch('http://localhost:3001/update-storage', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, addGb: -sizeGb })
+                    body: JSON.stringify({ userId, addGb: -sizeGb, apiKey: INTERNAL_API_KEY })
                 }).catch(e => log('ERROR', null, `Failed to update storage usage: ${e.message}`));
             }
             log('WARN', req, `All files deleted for user ${userId}`);
@@ -321,27 +412,39 @@ app.delete('/files/user/:userId/all', (req, res) => {
     });
 });
 
-app.get('/download/:fileId', (req, res) => {
+app.get('/download/:fileId', authenticateToken, (req, res) => {
     const { fileId } = req.params;
-    db.all(
-        `SELECT c.id, c.chunk_index
-         FROM chunks c
-         WHERE c.file_id = ?
-         ORDER BY c.chunk_index`,
-        [fileId],
-        (err, chunks) => {
-            if (err) {
-                log('ERROR', req, `Download fetch error: ${err.message}`);
-                return res.status(500).json({ error: 'Db error' });
-            }
-            log('INFO', req, `Download requested for file ${fileId}`);
-            res.json({ chunks: chunks.map(c => ({ chunkId: c.id, chunkIndex: c.chunk_index }))});
+
+    db.get('SELECT user_id FROM files WHERE id = ?', [fileId], (err, file) => {
+        if (!file || file.user_id !== req.userId) {
+            return res.status(403).json({ error: 'Unauthorized' });
         }
-    );
+
+        db.all(
+            `SELECT c.id, c.chunk_index, c.chunk_hash
+            FROM chunks c
+            WHERE c.file_id = ?
+            ORDER BY c.chunk_index`,
+            [fileId],
+            (err, chunks) => {
+                if (err) {
+                    log('ERROR', req, `Download fetch error: ${err.message}`);
+                    return res.status(500).json({ error: 'Db error' });
+                }
+                log('INFO', req, `Download requested for file ${fileId}`);
+                res.json({ chunks: chunks.map(c => ({ chunkId: c.id, chunkIndex: c.chunk_index, chunkHash: c.chunk_hash }))});
+            }
+        );
+    });
 });
 
-app.get('/files/user/:userId', (req, res) => {
+app.get('/files/user/:userId', authenticateToken, (req, res) => {
     const { userId } = req.params;
+
+    if (parseInt(userId) !== req.userId) {
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+
     db.all(
         'SELECT * FROM files WHERE user_id = ? ORDER BY created_at DESC',
         [userId],

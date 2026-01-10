@@ -12,6 +12,7 @@ db.run('PRAGMA journal_mode=WAL;');
 app.use(express.json());
 
 const SECRET_KEY = 'YOUR_SUPER_SECRET_KEY';
+const INTERNAL_API_KEY = 'YOUR_INTERNAL_SERVICE_KEY';
 
 function getIp(req) {
     return req.ip || req.connection.remoteAddress || 'unknown';
@@ -38,10 +39,11 @@ app.post('/register', async (req, res) => {
     try {
         const passwordHash = await bcrypt.hash(password, 10);
         const encryptionKey = crypto.randomBytes(32).toString('hex');
+        const peerSecret = crypto.randomBytes(32).toString('hex');
         
         db.run(
-            'INSERT INTO users (username, password_hash, encryption_key_encrypted) VALUES (?, ?, ?)',
-            [username, passwordHash, encryptionKey],
+            'INSERT INTO users (username, password_hash, encryption_key_encrypted, peer_secret) VALUES (?, ?, ?, ?)',
+            [username, passwordHash, encryptionKey, peerSecret],
             function(err) {
                 if (err) {
                     log('ERROR', req, `Registration failed for ${username}: ${err.message}`);
@@ -50,7 +52,7 @@ app.post('/register', async (req, res) => {
                 
                 const token = jwt.sign({ userId: this.lastID }, SECRET_KEY);
                 log('INFO', req, `New user registered: ${username} (ID: ${this.lastID})`);
-                res.json({ token, userId: this.lastID, encryptionKey });
+                res.json({ token, userId: this.lastID, encryptionKey, peerSecret });
             }
         );
     } catch (e) {
@@ -84,6 +86,7 @@ app.post('/login', async (req, res) => {
             token,
             userId: user.id,
             encryptionKey: user.encryption_key_encrypted,
+            peerSecret: user.peer_secret,
             storageLimitGb: user.storage_limit_gb,
             storageUsedGb: user.storage_used_gb
         });
@@ -106,6 +109,16 @@ function authenticateToken(req, res, next) {
         next();
     });
 }
+
+app.post('/sync-contribution', (req, res) => {
+    const { userId, chunksStored, apiKey } = req.body;
+    if (apiKey !== INTERNAL_API_KEY) return res.status(403).json({ error: 'Unauthorized' });
+    
+    db.run('UPDATE users SET chunks_stored = ? WHERE id = ?', [chunksStored, userId], (err) => {
+        if (err) return res.status(500).json({ error: 'Db error' });
+        res.json({ success: true });
+    });
+});
 
 app.post('/ping', authenticateToken, (req, res) => {
     const userId = req.userId;
@@ -145,17 +158,24 @@ app.post('/ping', authenticateToken, (req, res) => {
                         }
                     );
                     
-                    if (totalMinutes >= 4320) {
-                        db.run(
-                            'UPDATE users SET storage_limit_gb = storage_limit_gb + 1, total_online_minutes = 0 WHERE id = ?',
-                            [userId]
-                        );
-                        db.run('DELETE FROM ping_logs WHERE user_id = ?', [userId]);
-                        log('INFO', req, `UserID: ${userId} earned +1GB storage for 72h uptime!`);
-                        res.json({ message: 'Ping recorded. +1GB storage earned!', newLimit: true });
-                    } else {
-                        res.json({ message: 'Ping recorded', totalMinutes });
-                    }
+                    db.get('SELECT chunks_stored FROM users WHERE id = ?', [userId], (err, userStats) => {
+                        if (totalMinutes >= 4320) {
+                            if (userStats && userStats.chunks_stored >= 100) {
+                                db.run(
+                                    'UPDATE users SET storage_limit_gb = storage_limit_gb + 1, total_online_minutes = 0 WHERE id = ?',
+                                    [userId]
+                                );
+                                db.run('DELETE FROM ping_logs WHERE user_id = ?', [userId]);
+                                log('INFO', req, `UserID: ${userId} earned +1GB storage for 72h uptime and 100+ chunks!`);
+                                res.json({ message: 'Ping recorded. +1GB storage earned!', newLimit: true });
+                            } else {
+                                log('WARN', req, `UserID: ${userId} reached uptime goal but lacks chunks_stored proof.`);
+                                res.json({ message: 'Ping recorded. Uptime goal reached, but more chunks must be stored to earn reward.', totalMinutes });
+                            }
+                        } else {
+                            res.json({ message: 'Ping recorded', totalMinutes });
+                        }
+                    });
                 }
             );
         });
@@ -212,7 +232,12 @@ app.delete('/user', authenticateToken, (req, res) => {
 });
 
 app.post('/update-storage', (req, res) => {
-    const { userId, addGb } = req.body;
+    const { userId, addGb, apiKey } = req.body;
+    if (apiKey !== INTERNAL_API_KEY) {
+        log('WARN', req, 'Unauthorized storage update attempt');
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
     db.run(
         'UPDATE users SET storage_used_gb = storage_used_gb + ? WHERE id = ?',
         [addGb, userId],
@@ -228,7 +253,7 @@ app.post('/update-storage', (req, res) => {
 });
 
 app.get('/profile', authenticateToken, (req, res) => {
-    db.get('SELECT storage_limit_gb, storage_used_gb, total_online_minutes FROM users WHERE id = ?', [req.userId], (err, user) => {
+    db.get('SELECT storage_limit_gb, storage_used_gb, total_online_minutes, chunks_stored FROM users WHERE id = ?', [req.userId], (err, user) => {
         if (err) {
             log('ERROR', req, `Profile fetch db error for user ${req.userId}`);
             return res.status(500).json({ error: 'Db error' });

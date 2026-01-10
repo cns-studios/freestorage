@@ -45,6 +45,7 @@ db.serialize(() => {
     CREATE TABLE IF NOT EXISTS peers (
       id INTEGER PRIMARY KEY,
       user_id INTEGER UNIQUE NOT NULL,
+      peer_secret TEXT,
       online BOOLEAN DEFAULT 0,
       last_seen INTEGER,
       total_uptime_minutes INTEGER DEFAULT 0,
