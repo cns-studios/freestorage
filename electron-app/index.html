@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FreeStorage</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --sidebar-color: #1e293b;
+            --card-color: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-color: #06b6d4;
+            --accent-hover: #0891b2;
+            --danger-color: #ef4444;
+            --success-color: #10b981;
+            --border-color: #334155;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+            background-image: linear-gradient(var(--border-color) 1px, transparent 1px),
+            linear-gradient(90deg, var(--border-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+            background-position: center top;
+        }
+
+        /* Icons */
+        .icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        /* Auth Screen */
+        #auth-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+        .auth-card {
+            background: var(--card-color);
+            padding: 2rem;
+            border-radius: 12px;
+            width: 350px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border-color);
+        }
+        h2 { margin-top: 0; color: var(--accent-color); text-transform: uppercase; letter-spacing: 1px; font-size: 1.2rem; }
+        
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: white;
+            box-sizing: border-box;
+        }
+        input:focus { outline: 2px solid var(--accent-color); border-color: transparent; }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        button:hover { background: var(--accent-hover); }
+        button.secondary { background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); }
+        button.secondary:hover { border-color: var(--text-primary); color: var(--text-primary); }
+        button.danger { background: var(--danger-color); }
+        button.danger:hover { background: #b91c1c; }
+
+        /* App Layout */
+        #app-screen { display: none; width: 100%; height: 100%; }
+        .sidebar {
+            width: 240px;
+            background: var(--sidebar-color);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+        }
+        .logo { font-size: 1.2rem; font-weight: bold; color: var(--accent-color); margin-bottom: 2rem; display: flex; align-items: center; gap: 10px; }
+        
+        .nav-item {
+            padding: 10px;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+        .nav-item:hover, .nav-item.active { background: rgba(6, 182, 212, 0.1); color: var(--accent-color); }
+
+        .main-content {
+            flex-grow: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        /* Tabs */
+        .tab-content { display: none; animation: fadeIn 0.3s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Dashboard */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: var(--card-color); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color); }
+        .stat-value { font-size: 2rem; font-weight: bold; color: var(--text-primary); }
+        .stat-label { color: var(--text-secondary); font-size: 0.9rem; margin-top: 5px; }
+
+        /* File List */
+        .file-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.9rem; }
+        .file-table th { text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); }
+        .file-table td { padding: 10px; border-bottom: 1px solid var(--border-color); }
+        .file-table tr:hover { background: rgba(255,255,255,0.02); }
+        
+        .status-badge { padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; }
+        .status-complete { background: rgba(16, 185, 129, 0.2); color: var(--success-color); }
+        .status-pending { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+
+        /* Upload Area */
+        .upload-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 3rem;
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            transition: border-color 0.2s;
+        }
+        .upload-zone:hover { border-color: var(--accent-color); color: var(--accent-color); cursor: pointer; }
+        .progress-bar { height: 6px; background: var(--bg-color); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+        .progress-fill { height: 100%; background: var(--accent-color); width: 0%; transition: width 0.3s; }
+
+        /* Settings */
+        .settings-group { margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border-color); }
+        .settings-group h3 { margin-bottom: 1rem; color: var(--text-primary); }
+
+        #loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.8); z-index: 1000; justify-content: center; align-items: center; color: var(--accent-color); font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="loading-overlay">PROCESSING...</div>
+
+    <!-- Auth Screen -->
+    <div id="auth-screen">
+        <div class="auth-card">
+            <h2>FreeStorage // Secure</h2>
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <p id="auth-msg" style="color: var(--danger-color); font-size: 0.8rem; min-height: 1rem;"></p>
+            <button onclick="login()">LOGIN</button>
+            <button class="secondary" onclick="register()">REGISTER NEW ACCOUNT</button>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app-screen">
+        <div class="sidebar">
+            <div class="logo">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                FS // CLIENT
+            </div>
+            <div class="nav-item active" onclick="switchTab('dashboard')">
+                <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                Dashboard
+            </div>
+            <div class="nav-item" onclick="switchTab('files')">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                My Files
+            </div>
+            <div class="nav-item" onclick="switchTab('upload')">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                Upload
+            </div>
+            <div class="nav-item" onclick="switchTab('settings')">
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                Settings
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active">
+                <h1>System Status</h1>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="storage-used">0 GB</div>
+                        <div class="stat-label">Storage Used</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="storage-limit">10 GB</div>
+                        <div class="stat-label">Total Limit</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="time-to-next">--:--</div>
+                        <div class="stat-label">Time to +1GB Reward</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Files Tab -->
+            <div id="files" class="tab-content">
+                <div style="display:flex; justify-content:space-between; align-items:center">
+                    <h1>Repository</h1>
+                    <button class="secondary" style="width:auto" onclick="refreshFiles()">Refresh Index</button>
+                </div>
+                <table class="file-table">
+                    <thead>
+                        <tr>
+                            <th>Filename / Path</th>
+                            <th>Size</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="file-list-body"></tbody>
+                </table>
+            </div>
+
+            <!-- Upload Tab -->
+            <div id="upload" class="tab-content">
+                <h1>Secure Upload</h1>
+                
+                <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+                    <p>Click to select File</p>
+                    <input type="file" id="fileInput" style="display:none" onchange="handleFileSelect(this)">
+                </div>
+                
+                <div class="upload-zone" onclick="document.getElementById('folderInput').click()">
+                    <p>Click to select Folder (Recursive)</p>
+                    <input type="file" id="folderInput" webkitdirectory directory style="display:none" onchange="handleFolderSelect(this)">
+                </div>
+
+                <div id="upload-status"></div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings" class="tab-content">
+                <h1>Account Settings</h1>
+                
+                <div class="settings-group">
+                    <h3>Update Credentials</h3>
+                    <input type="text" id="new-username" placeholder="New Username">
+                    <input type="password" id="new-password" placeholder="New Password">
+                    <button onclick="updateAccount()">Update</button>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Danger Zone</h3>
+                    <button class="danger" onclick="deleteAllFiles()">Delete All Files (Irreversible)</button>
+                    <button class="danger" onclick="deleteAccount()">Delete Account (Irreversible)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let profileData = {};
+
+        // -- Navigation --
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            
+            // Highlight nav item (simple matching)
+            const navIndex = ['dashboard', 'files', 'upload', 'settings'].indexOf(tabId);
+            if(navIndex >= 0) document.querySelectorAll('.nav-item')[navIndex].classList.add('active');
+
+            if (tabId === 'files' || tabId === 'dashboard') loadProfile();
+            if (tabId === 'files') refreshFiles();
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
+        }
+
+        // -- Auth --
+        async function login() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            if(!u || !p) return;
+            showLoading(true);
+            const res = await window.api.login({ username: u, password: p });
+            showLoading(false);
+            if(res.success) {
+                currentUser = res.data;
+                document.getElementById('auth-screen').style.display = 'none';
+                document.getElementById('app-screen').style.display = 'flex';
+                loadProfile();
+            } else {
+                document.getElementById('auth-msg').innerText = res.error;
+            }
+        }
+
+        async function register() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            if(!u || !p) return;
+            showLoading(true);
+            const res = await window.api.register({ username: u, password: p });
+            showLoading(false);
+            if(res.success) {
+                currentUser = res.data;
+                document.getElementById('auth-screen').style.display = 'none';
+                document.getElementById('app-screen').style.display = 'flex';
+                loadProfile();
+            } else {
+                document.getElementById('auth-msg').innerText = res.error;
+            }
+        }
+
+        // -- Data --
+        async function loadProfile() {
+            if(!currentUser) return;
+            const profile = await window.api.getProfile(currentUser.token);
+            if(profile.error) return;
+            profileData = profile;
+            
+            document.getElementById('storage-used').innerText = profile.storage_used_gb.toFixed(2) + ' GB';
+            document.getElementById('storage-limit').innerText = profile.storage_limit_gb + ' GB';
+            
+            // Calc time to next
+            const mins = profile.total_online_minutes;
+            const target = 4320; // 72h
+            const remaining = target - mins;
+            const hoursLeft = Math.floor(remaining / 60);
+            const minsLeft = remaining % 60;
+            document.getElementById('time-to-next').innerText = `${hoursLeft}h ${minsLeft}m`;
+        }
+
+        async function refreshFiles() {
+            const res = await window.api.getFiles(currentUser.userId);
+            const tbody = document.getElementById('file-list-body');
+            tbody.innerHTML = '';
+            
+            if(res.files && res.files.length > 0) {
+                res.files.forEach(file => {
+                    const tr = document.createElement('tr');
+                    const sizeMb = (file.file_size_bytes / (1024 * 1024)).toFixed(2);
+                    const statusClass = file.upload_status === 'complete' ? 'status-complete' : 'status-pending';
+                    
+                    tr.innerHTML = `
+                        <td style="font-family:monospace">${file.filename}</td>
+                        <td>${sizeMb} MB</td>
+                        <td><span class="status-badge ${statusClass}">${file.upload_status.toUpperCase()}</span></td>
+                        <td>
+                            <button class="secondary" style="width:auto; padding:5px 10px;" onclick="downloadFile('${file.id}')">↓</button>
+                            <button class="danger" style="width:auto; padding:5px 10px;" onclick="deleteFile('${file.id}')">×</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">No files found.</td></tr>';
+            }
+        }
+
+        // -- Actions --
+        async function handleFileSelect(input) {
+            if(!input.files[0]) return;
+            await processUpload(input.files[0]);
+        }
+
+        async function handleFolderSelect(input) {
+            if(!input.files.length) return;
+            const statusDiv = document.getElementById('upload-status');
+            statusDiv.innerHTML = '';
+            
+            for(let i=0; i<input.files.length; i++) {
+                const file = input.files[i];
+                // webkitRelativePath contains the folder path
+                await processUpload(file, file.webkitRelativePath);
+            }
+        }
+
+        async function processUpload(file, relativePath) {
+            const statusDiv = document.getElementById('upload-status');
+            const itemDiv = document.createElement('div');
+            itemDiv.style.marginBottom = '10px';
+            itemDiv.innerHTML = `
+                <div style="font-size:0.9rem">${relativePath || file.name}</div>
+                <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+            `;
+            statusDiv.appendChild(itemDiv);
+            
+            // Because ipcRenderer is single-channel for progress, multiple parallel uploads might glitch the bar visually,
+            // but the logic holds. Ideally we generate a unique ID for each upload to track progress.
+            // For this prototype, we just await one by one.
+            
+            // Listen for progress
+            const progressHandler = (data) => {
+                const pct = (data.current / data.total) * 100;
+                itemDiv.querySelector('.progress-fill').style.width = pct + '%';
+            };
+            
+            // Using a temporary listener approach or assuming sequential
+            // To make it clean, we just assume sequential for folder upload loop.
+            
+            // Note: main.js sends 'upload-progress' globally.
+            // We'll update the *last* added bar.
+            
+            const onProgress = (evt, data) => {
+                 const pct = (data.current / data.total) * 100;
+                 itemDiv.querySelector('.progress-fill').style.width = pct + '%';
+            };
+            // ipcRenderer.on is a bit global.
+            // Simplified: we won't show perfect per-file progress in parallel, just basic feedback.
+            
+            try {
+                // Pass filePath and relativePath
+                await window.api.uploadFile({ 
+                    filePath: file.path, 
+                    relativePath: relativePath 
+                });
+                itemDiv.querySelector('.progress-fill').style.width = '100%';
+                itemDiv.querySelector('.progress-fill').style.backgroundColor = 'var(--success-color)';
+            } catch(e) {
+                itemDiv.style.color = 'var(--danger-color)';
+                itemDiv.innerText += ' FAILED';
+            }
+        }
+        
+        // Setup simple global progress listener
+        window.api.onUploadProgress((data) => {
+             // This updates the most recent progress bar roughly
+             const bars = document.querySelectorAll('.progress-fill');
+             if(bars.length > 0) {
+                 const lastBar = bars[bars.length - 1];
+                 if(lastBar.style.backgroundColor !== 'var(--success-color)') {
+                     lastBar.style.width = ((data.current / data.total) * 100) + '%';
+                 }
+             }
+        });
+
+        async function downloadFile(id) {
+            if(!confirm('Download?')) return;
+            showLoading(true);
+            const res = await window.api.downloadFile(id);
+            showLoading(false);
+            if(res.error) alert('Error: ' + res.error);
+            else alert('Saved to: ' + res.savePath);
+        }
+
+        async function deleteFile(id) {
+            if(!confirm('Delete permanently?')) return;
+            const res = await window.api.deleteFile(id);
+            if(res.success) refreshFiles();
+        }
+
+        // -- Settings --
+        async function updateAccount() {
+            const u = document.getElementById('new-username').value;
+            const p = document.getElementById('new-password').value;
+            if(!u && !p) return;
+            
+            showLoading(true);
+            const res = await window.api.updateAccount({ username: u, password: p });
+            showLoading(false);
+            if(res.success) alert('Account updated!');
+            else alert('Error: ' + res.error);
+        }
+
+        async function deleteAllFiles() {
+            if(!confirm('DELETE ALL FILES? This cannot be undone.')) return;
+            showLoading(true);
+            const res = await window.api.deleteAllFiles(currentUser.userId);
+            showLoading(false);
+            if(res.success) { alert('All files deleted.'); refreshFiles(); loadProfile(); }
+            else alert('Error: ' + res.error);
+        }
+
+        async function deleteAccount() {
+            if(!confirm('DELETE ACCOUNT? This is the end.')) return;
+            showLoading(true);
+            const res = await window.api.deleteAccount();
+            showLoading(false);
+            if(res.success) location.reload(); // Logout/Reset
+            else alert('Error: ' + res.error);
+        }
+    </script>
+</body>
+</html>
