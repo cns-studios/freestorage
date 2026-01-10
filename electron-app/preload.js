@@ -11,5 +11,11 @@ contextBridge.exposeInMainWorld('api', {
     updateAccount: (data) => ipcRenderer.invoke('update-account', data),
     deleteAccount: () => ipcRenderer.invoke('delete-account'),
     deleteAllFiles: (userId) => ipcRenderer.invoke('delete-all-files', userId),
-    onUploadProgress: (callback) => ipcRenderer.on('upload-progress', (event, data) => callback(data))
+    onUploadProgress: (callback) => ipcRenderer.on('upload-progress', (event, data) => callback(data)),
+    
+    // Auth & Window
+    checkAuth: () => ipcRenderer.invoke('check-auth'),
+    logout: () => ipcRenderer.invoke('logout'),
+    minimizeWindow: () => ipcRenderer.invoke('window-minimize'),
+    closeWindow: () => ipcRenderer.invoke('window-close')
 });

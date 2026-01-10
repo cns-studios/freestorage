@@ -3,36 +3,45 @@
 <head>
     <title>FreeStorage</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Inter:wght@100..900&display=swap');
+
         :root {
-            --bg-color: #0f172a;
-            --sidebar-color: #1e293b;
-            --card-color: #1e293b;
-            --text-primary: #f1f5f9;
-            --text-secondary: #94a3b8;
-            --accent-color: #06b6d4;
-            --accent-hover: #0891b2;
+            --bg-color: #000000;
+            --sidebar-color: #000000;
+            --card-color: #0a0a0a;
+            --text-primary: #ededed;
+            --text-secondary: #888888;
+            --text-tertiary: #444444;
+            --accent-color: #ffffff;
+            --accent-hover: #e5e5e5;
             --danger-color: #ef4444;
             --success-color: #10b981;
-            --border-color: #334155;
+            --border-color: #333333;
+            --hover-bg: #1a1a1a;
+            --input-bg: #0a0a0a;
         }
 
         body {
             margin: 0;
             padding: 0;
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-primary);
             height: 100vh;
             display: flex;
             overflow: hidden;
-            background-image: linear-gradient(var(--border-color) 1px, transparent 1px),
-            linear-gradient(90deg, var(--border-color) 1px, transparent 1px);
-            background-size: 40px 40px;
-            background-position: center top;
+            font-size: 14px;
+            -webkit-font-smoothing: antialiased;
         }
 
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+
         /* Icons */
-        .icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 
         /* Auth Screen */
         #auth-screen {
@@ -45,130 +54,382 @@
             z-index: 200;
         }
         .auth-card {
-            background: var(--card-color);
-            padding: 2rem;
-            border-radius: 12px;
-            width: 350px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-            border: 1px solid var(--border-color);
+            background: var(--bg-color);
+            padding: 2.5rem;
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
-        h2 { margin-top: 0; color: var(--accent-color); text-transform: uppercase; letter-spacing: 1px; font-size: 1.2rem; }
+        .auth-header { margin-bottom: 1rem; text-align: center; }
+        h2 { margin: 0; color: var(--text-primary); font-weight: 600; font-size: 1.5rem; letter-spacing: -0.02em; }
+        .subtitle { color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem; }
         
         input {
             width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            background: #0f172a;
+            padding: 0.75rem 1rem;
+            background: var(--input-bg);
             border: 1px solid var(--border-color);
             border-radius: 6px;
-            color: white;
+            color: var(--text-primary);
             box-sizing: border-box;
+            font-family: inherit;
+            font-size: 0.875rem;
+            transition: border-color 0.15s ease;
         }
-        input:focus { outline: 2px solid var(--accent-color); border-color: transparent; }
+        input:focus { outline: none; border-color: var(--text-secondary); }
+        input::placeholder { color: var(--text-tertiary); }
 
         button {
             width: 100%;
-            padding: 10px;
-            margin-top: 10px;
+            padding: 0.75rem 1rem;
             background: var(--accent-color);
-            color: white;
-            border: none;
+            color: #000;
+            border: 1px solid var(--accent-color);
             border-radius: 6px;
             cursor: pointer;
-            font-weight: 600;
-            transition: background 0.2s;
+            font-weight: 500;
+            font-size: 0.875rem;
+            transition: all 0.15s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
         }
-        button:hover { background: var(--accent-hover); }
-        button.secondary { background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); }
-        button.secondary:hover { border-color: var(--text-primary); color: var(--text-primary); }
-        button.danger { background: var(--danger-color); }
-        button.danger:hover { background: #b91c1c; }
+        button:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+        
+        button.secondary { 
+            background: transparent; 
+            border: 1px solid var(--border-color); 
+            color: var(--text-primary); 
+        }
+        button.secondary:hover { 
+            background: var(--hover-bg); 
+            border-color: var(--text-secondary);
+        }
+        
+        button.danger { 
+            background: rgba(239, 68, 68, 0.1); 
+            color: var(--danger-color); 
+            border-color: rgba(239, 68, 68, 0.2); 
+        }
+        button.danger:hover { 
+            background: rgba(239, 68, 68, 0.2); 
+            border-color: var(--danger-color); 
+        }
 
         /* App Layout */
         #app-screen { display: none; width: 100%; height: 100%; }
+        
         .sidebar {
             width: 240px;
             background: var(--sidebar-color);
             border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
-            padding: 1rem;
+            padding: 1.5rem 1rem;
+            flex-shrink: 0;
         }
-        .logo { font-size: 1.2rem; font-weight: bold; color: var(--accent-color); margin-bottom: 2rem; display: flex; align-items: center; gap: 10px; }
+        
+        .logo { 
+            font-size: 1rem; 
+            font-weight: 600; 
+            color: var(--text-primary); 
+            margin-bottom: 2rem; 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+            padding: 0 0.5rem;
+        }
+        .logo-icon {
+            width: 24px;
+            height: 24px;
+            background: var(--text-primary);
+            color: black;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .logo-icon svg { width: 16px; height: 16px; stroke: black; }
         
         .nav-item {
-            padding: 10px;
-            margin-bottom: 5px;
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 2px;
             border-radius: 6px;
             cursor: pointer;
             color: var(--text-secondary);
             display: flex;
             align-items: center;
-            gap: 10px;
-            transition: all 0.2s;
+            gap: 12px;
+            transition: all 0.15s ease;
+            font-size: 0.875rem;
+            font-weight: 400;
         }
-        .nav-item:hover, .nav-item.active { background: rgba(6, 182, 212, 0.1); color: var(--accent-color); }
+        .nav-item:hover { background: var(--hover-bg); color: var(--text-primary); }
+        .nav-item.active { background: var(--hover-bg); color: var(--text-primary); font-weight: 500; }
 
         .main-content {
             flex-grow: 1;
-            padding: 2rem;
+            padding: 2rem 3rem;
             overflow-y: auto;
+            background: var(--bg-color);
         }
 
+        /* Headers */
+        h1 { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 2rem; margin-top: 0; color: var(--text-primary); }
+        
         /* Tabs */
-        .tab-content { display: none; animation: fadeIn 0.3s ease; }
+        .tab-content { display: none; animation: fadeIn 0.2s ease; }
         .tab-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Dashboard */
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-        .stat-card { background: var(--card-color); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color); }
-        .stat-value { font-size: 2rem; font-weight: bold; color: var(--text-primary); }
-        .stat-label { color: var(--text-secondary); font-size: 0.9rem; margin-top: 5px; }
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 1rem; 
+            margin-bottom: 2rem; 
+        }
+        .stat-card { 
+            background: var(--card-color); 
+            padding: 1.5rem; 
+            border-radius: 8px; 
+            border: 1px solid var(--border-color); 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100px;
+        }
+        .stat-label { color: var(--text-secondary); font-size: 0.875rem; font-weight: 500; }
+        .stat-value { font-size: 1.75rem; font-weight: 600; color: var(--text-primary); margin-top: auto; letter-spacing: -0.03em; }
 
         /* File List */
-        .file-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.9rem; }
-        .file-table th { text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); }
-        .file-table td { padding: 10px; border-bottom: 1px solid var(--border-color); }
-        .file-table tr:hover { background: rgba(255,255,255,0.02); }
+        .file-table-container {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .file-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        .file-table th { 
+            text-align: left; 
+            padding: 0.75rem 1.5rem; 
+            border-bottom: 1px solid var(--border-color); 
+            color: var(--text-secondary); 
+            font-weight: 500;
+            background: var(--card-color);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .file-table td { padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border-color); color: var(--text-primary); }
+        .file-table tr:last-child td { border-bottom: none; }
+        .file-table tr:hover { background: var(--hover-bg); }
         
-        .status-badge { padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; }
-        .status-complete { background: rgba(16, 185, 129, 0.2); color: var(--success-color); }
-        .status-pending { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .status-badge { 
+            padding: 2px 8px; 
+            border-radius: 999px; 
+            font-size: 0.75rem; 
+            font-weight: 500;
+            border: 1px solid transparent;
+        }
+        .status-complete { 
+            background: transparent; 
+            color: var(--text-primary); 
+            border-color: var(--border-color);
+        }
+        .status-pending { 
+            background: rgba(255, 255, 255, 0.1); 
+            color: var(--text-primary);
+            border-color: transparent; 
+        }
+
+        .action-btn-group { display: flex; gap: 8px; }
+        .action-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .action-btn:hover { border-color: var(--text-secondary); color: var(--text-primary); background: var(--hover-bg); }
+        .action-btn.delete:hover { border-color: var(--text-secondary); color: var(--text-primary); background: var(--hover-bg); }
 
         /* Upload Area */
+        .upload-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
         .upload-zone {
-            border: 2px dashed var(--border-color);
+            border: 1px dashed var(--border-color);
             border-radius: 8px;
-            padding: 3rem;
+            padding: 4rem 2rem;
             text-align: center;
             color: var(--text-secondary);
-            margin-bottom: 1rem;
-            transition: border-color 0.2s;
+            background: var(--card-color);
+            transition: all 0.2s;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
         }
-        .upload-zone:hover { border-color: var(--accent-color); color: var(--accent-color); cursor: pointer; }
-        .progress-bar { height: 6px; background: var(--bg-color); border-radius: 3px; overflow: hidden; margin-top: 10px; }
-        .progress-fill { height: 100%; background: var(--accent-color); width: 0%; transition: width 0.3s; }
+        .upload-zone:hover { 
+            border-color: var(--text-secondary); 
+            background: var(--hover-bg);
+            color: var(--text-primary);
+        }
+        .upload-icon {
+            width: 48px;
+            height: 48px;
+            stroke-width: 1;
+            color: var(--text-tertiary);
+        }
+        .upload-zone:hover .upload-icon { color: var(--text-primary); }
+
+        .progress-item {
+            background: var(--card-color);
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .progress-info { flex-grow: 1; }
+        .progress-name { font-size: 0.875rem; margin-bottom: 0.25rem; font-family: monospace; }
+        .progress-bar-bg { height: 4px; background: var(--border-color); border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--text-primary); width: 0%; transition: width 0.2s; }
+        .progress-status { font-size: 0.75rem; color: var(--text-secondary); width: 40px; text-align: right; }
 
         /* Settings */
-        .settings-group { margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border-color); }
-        .settings-group h3 { margin-bottom: 1rem; color: var(--text-primary); }
+        .settings-section {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            background: var(--card-color);
+        }
+        .settings-section h3 { margin: 0 0 1rem 0; font-size: 1rem; font-weight: 500; }
+        .settings-form { display: grid; gap: 1rem; max-width: 400px; }
 
-        #loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.8); z-index: 1000; justify-content: center; align-items: center; color: var(--accent-color); font-weight: bold; }
+        #loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(2px); }
+        .loader {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--text-primary);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Custom Title Bar */
+        #title-bar {
+            height: 36px;
+            background: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+            -webkit-app-region: drag; /* Make draggable */
+            user-select: none;
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 1000;
+        }
+        .title-drag-area {
+            flex-grow: 1;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            gap: 10px;
+        }
+        .window-controls {
+            display: flex;
+            gap: 5px;
+            -webkit-app-region: no-drag;
+        }
+        .control-btn {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+        .control-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
+        .control-btn.close:hover { background: var(--danger-color); color: white; }
+
+        /* Adjust body for fixed title bar */
+        body { padding-top: 36px; }
+        #auth-screen, #app-screen { height: calc(100vh - 36px); top: 36px; }
     </style>
 </head>
 <body>
-    <div id="loading-overlay">PROCESSING...</div>
+    <div id="loading-overlay">
+        <div class="loader"></div>
+    </div>
+
+    <!-- Custom Title Bar -->
+    <div id="title-bar">
+        <div class="title-drag-area">
+             <div class="logo-icon" style="width: 20px; height: 20px; background: transparent;">
+                <svg class="icon" style="stroke: var(--text-secondary); width: 14px; height: 14px;" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            </div>
+            FreeStorage // Client
+        </div>
+        <div class="window-controls">
+            <div class="control-btn" onclick="window.api.minimizeWindow()">
+                <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><rect width="10" height="1"></rect></svg>
+            </div>
+            <div class="control-btn close" onclick="window.api.closeWindow()">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M1 1l8 8M9 1L1 9"></path></svg>
+            </div>
+        </div>
+    </div>
 
     <!-- Auth Screen -->
     <div id="auth-screen">
         <div class="auth-card">
-            <h2>FreeStorage // Secure</h2>
-            <input type="text" id="username" placeholder="Username">
-            <input type="password" id="password" placeholder="Password">
-            <p id="auth-msg" style="color: var(--danger-color); font-size: 0.8rem; min-height: 1rem;"></p>
-            <button onclick="login()">LOGIN</button>
-            <button class="secondary" onclick="register()">REGISTER NEW ACCOUNT</button>
+            <div class="auth-header">
+                <div style="display: flex; justify-content: center; margin-bottom: 1rem;">
+                    <div class="logo-icon" style="width: 40px; height: 40px;">
+                        <svg class="icon" style="width: 24px; height: 24px;" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                    </div>
+                </div>
+                <h2>FreeStorage</h2>
+                <div class="subtitle">Secure decentralized storage</div>
+            </div>
+            
+            <div style="display: grid; gap: 10px;">
+                <input type="text" id="username" placeholder="Username">
+                <input type="password" id="password" placeholder="Password">
+            </div>
+
+            <p id="auth-msg" style="color: var(--danger-color); font-size: 0.75rem; min-height: 1rem; margin: 0; text-align: center;"></p>
+            
+            <div style="display: grid; gap: 10px; margin-top: 10px;">
+                <button onclick="login()">Log In</button>
+                <button class="secondary" onclick="register()">Create Account</button>
+            </div>
         </div>
     </div>
 
@@ -176,78 +437,101 @@
     <div id="app-screen">
         <div class="sidebar">
             <div class="logo">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-                FS // CLIENT
+                <div class="logo-icon">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                </div>
+                FreeStorage
             </div>
+            
             <div class="nav-item active" onclick="switchTab('dashboard')">
                 <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                Dashboard
+                Overview
             </div>
             <div class="nav-item" onclick="switchTab('files')">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                My Files
+                Files
             </div>
             <div class="nav-item" onclick="switchTab('upload')">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                 Upload
             </div>
+            <div style="flex-grow: 1;"></div>
             <div class="nav-item" onclick="switchTab('settings')">
                 <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                 Settings
+            </div>
+            <div class="nav-item" onclick="logout()" style="color: var(--danger-color);">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                Log Out
             </div>
         </div>
 
         <div class="main-content">
             <!-- Dashboard Tab -->
             <div id="dashboard" class="tab-content active">
-                <h1>System Status</h1>
+                <h1>Overview</h1>
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <div class="stat-value" id="storage-used">0 GB</div>
                         <div class="stat-label">Storage Used</div>
+                        <div class="stat-value" id="storage-used">0 GB</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value" id="storage-limit">10 GB</div>
                         <div class="stat-label">Total Limit</div>
+                        <div class="stat-value" id="storage-limit">10 GB</div>
                     </div>
                     <div class="stat-card">
+                        <div class="stat-label">Next Reward In</div>
                         <div class="stat-value" id="time-to-next">--:--</div>
-                        <div class="stat-label">Time to +1GB Reward</div>
                     </div>
                 </div>
             </div>
 
             <!-- Files Tab -->
             <div id="files" class="tab-content">
-                <div style="display:flex; justify-content:space-between; align-items:center">
-                    <h1>Repository</h1>
-                    <button class="secondary" style="width:auto" onclick="refreshFiles()">Refresh Index</button>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.5rem;">
+                    <h1>Files</h1>
+                    <button class="secondary" style="width:auto" onclick="refreshFiles()">
+                        <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        Refresh
+                    </button>
                 </div>
-                <table class="file-table">
-                    <thead>
-                        <tr>
-                            <th>Filename / Path</th>
-                            <th>Size</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="file-list-body"></tbody>
-                </table>
+                <div class="file-table-container">
+                    <table class="file-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Size</th>
+                                <th>Status</th>
+                                <th style="text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="file-list-body"></tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- Upload Tab -->
             <div id="upload" class="tab-content">
-                <h1>Secure Upload</h1>
+                <h1>Upload</h1>
                 
-                <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
-                    <p>Click to select File</p>
-                    <input type="file" id="fileInput" style="display:none" onchange="handleFileSelect(this)">
-                </div>
-                
-                <div class="upload-zone" onclick="document.getElementById('folderInput').click()">
-                    <p>Click to select Folder (Recursive)</p>
-                    <input type="file" id="folderInput" webkitdirectory directory style="display:none" onchange="handleFolderSelect(this)">
+                <div class="upload-grid">
+                    <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+                        <svg class="icon upload-icon" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                        <div>
+                            <div style="font-weight: 500; color: var(--text-primary); margin-bottom: 0.25rem;">Select File</div>
+                            <div style="font-size: 0.75rem;">Single file upload</div>
+                        </div>
+                        <input type="file" id="fileInput" style="display:none" onchange="handleFileSelect(this)">
+                    </div>
+                    
+                    <div class="upload-zone" onclick="document.getElementById('folderInput').click()">
+                        <svg class="icon upload-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                        <div>
+                            <div style="font-weight: 500; color: var(--text-primary); margin-bottom: 0.25rem;">Select Folder</div>
+                            <div style="font-size: 0.75rem;">Recursive upload</div>
+                        </div>
+                        <input type="file" id="folderInput" webkitdirectory directory style="display:none" onchange="handleFolderSelect(this)">
+                    </div>
                 </div>
 
                 <div id="upload-status"></div>
@@ -255,19 +539,23 @@
 
             <!-- Settings Tab -->
             <div id="settings" class="tab-content">
-                <h1>Account Settings</h1>
+                <h1>Settings</h1>
                 
-                <div class="settings-group">
-                    <h3>Update Credentials</h3>
-                    <input type="text" id="new-username" placeholder="New Username">
-                    <input type="password" id="new-password" placeholder="New Password">
-                    <button onclick="updateAccount()">Update</button>
+                <div class="settings-section">
+                    <h3>Account</h3>
+                    <div class="settings-form">
+                        <input type="text" id="new-username" placeholder="New Username">
+                        <input type="password" id="new-password" placeholder="New Password">
+                        <button class="secondary" onclick="updateAccount()">Update Credentials</button>
+                    </div>
                 </div>
 
-                <div class="settings-group">
-                    <h3>Danger Zone</h3>
-                    <button class="danger" onclick="deleteAllFiles()">Delete All Files (Irreversible)</button>
-                    <button class="danger" onclick="deleteAccount()">Delete Account (Irreversible)</button>
+                <div class="settings-section" style="border-color: rgba(239, 68, 68, 0.2);">
+                    <h3 style="color: var(--danger-color);">Danger Zone</h3>
+                    <div class="settings-form">
+                        <button class="danger" onclick="deleteAllFiles()">Delete All Files</button>
+                        <button class="danger" onclick="deleteAccount()">Delete Account</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -283,9 +571,17 @@
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
             
-            // Highlight nav item (simple matching)
-            const navIndex = ['dashboard', 'files', 'upload', 'settings'].indexOf(tabId);
-            if(navIndex >= 0) document.querySelectorAll('.nav-item')[navIndex].classList.add('active');
+            const navItems = {
+                'dashboard': 0,
+                'files': 1,
+                'upload': 2,
+                'settings': 3
+            };
+            
+            const idx = navItems[tabId];
+            if (idx !== undefined) {
+                document.querySelectorAll('.nav-item')[idx].classList.add('active');
+            }
 
             if (tabId === 'files' || tabId === 'dashboard') loadProfile();
             if (tabId === 'files') refreshFiles();
@@ -361,18 +657,24 @@
                     const statusClass = file.upload_status === 'complete' ? 'status-complete' : 'status-pending';
                     
                     tr.innerHTML = `
-                        <td style="font-family:monospace">${file.filename}</td>
-                        <td>${sizeMb} MB</td>
-                        <td><span class="status-badge ${statusClass}">${file.upload_status.toUpperCase()}</span></td>
+                        <td style="font-family: monospace; color: var(--text-primary);">${file.filename}</td>
+                        <td style="color: var(--text-secondary);">${sizeMb} MB</td>
+                        <td><span class="status-badge ${statusClass}">${file.upload_status}</span></td>
                         <td>
-                            <button class="secondary" style="width:auto; padding:5px 10px;" onclick="downloadFile('${file.id}')">↓</button>
-                            <button class="danger" style="width:auto; padding:5px 10px;" onclick="deleteFile('${file.id}')">×</button>
+                            <div class="action-btn-group" style="justify-content: flex-end;">
+                                <button class="action-btn" title="Download" onclick="downloadFile('${file.id}')">
+                                    <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                </button>
+                                <button class="action-btn delete" title="Delete" onclick="deleteFile('${file.id}')">
+                                    <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                </button>
+                            </div>
                         </td>
                     `;
                     tbody.appendChild(tr);
                 });
             } else {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">No files found.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:3rem; color: var(--text-tertiary);">No files found</td></tr>';
             }
         }
 
@@ -397,73 +699,59 @@
         async function processUpload(file, relativePath) {
             const statusDiv = document.getElementById('upload-status');
             const itemDiv = document.createElement('div');
-            itemDiv.style.marginBottom = '10px';
+            itemDiv.className = 'progress-item';
+            
             itemDiv.innerHTML = `
-                <div style="font-size:0.9rem">${relativePath || file.name}</div>
-                <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+                <div class="progress-info">
+                    <div class="progress-name">${relativePath || file.name}</div>
+                    <div class="progress-bar-bg"><div class="progress-fill" style="width:0%"></div></div>
+                </div>
+                <div class="progress-status">0%</div>
             `;
-            statusDiv.appendChild(itemDiv);
+            statusDiv.prepend(itemDiv); // Add new items to top
             
-            // Because ipcRenderer is single-channel for progress, multiple parallel uploads might glitch the bar visually,
-            // but the logic holds. Ideally we generate a unique ID for each upload to track progress.
-            // For this prototype, we just await one by one.
-            
-            // Listen for progress
-            const progressHandler = (data) => {
-                const pct = (data.current / data.total) * 100;
-                itemDiv.querySelector('.progress-fill').style.width = pct + '%';
-            };
-            
-            // Using a temporary listener approach or assuming sequential
-            // To make it clean, we just assume sequential for folder upload loop.
-            
-            // Note: main.js sends 'upload-progress' globally.
-            // We'll update the *last* added bar.
-            
-            const onProgress = (evt, data) => {
-                 const pct = (data.current / data.total) * 100;
-                 itemDiv.querySelector('.progress-fill').style.width = pct + '%';
-            };
-            // ipcRenderer.on is a bit global.
-            // Simplified: we won't show perfect per-file progress in parallel, just basic feedback.
+            const fill = itemDiv.querySelector('.progress-fill');
+            const status = itemDiv.querySelector('.progress-status');
+
+            // Simplified progress tracking
+            window.api.onUploadProgress((data) => {
+                 // Note: this is a global listener for ALL uploads, 
+                 // which is a limitation of this simple prototype.
+                 // We will update the *latest* bar for visual feedback.
+                 const pct = Math.round((data.current / data.total) * 100);
+                 if (fill.style.width !== '100%') {
+                    fill.style.width = pct + '%';
+                    status.innerText = pct + '%';
+                 }
+            });
             
             try {
-                // Pass filePath and relativePath
                 await window.api.uploadFile({ 
                     filePath: file.path, 
                     relativePath: relativePath 
                 });
-                itemDiv.querySelector('.progress-fill').style.width = '100%';
-                itemDiv.querySelector('.progress-fill').style.backgroundColor = 'var(--success-color)';
+                fill.style.width = '100%';
+                fill.style.background = 'var(--success-color)';
+                status.innerText = 'OK';
+                status.style.color = 'var(--success-color)';
             } catch(e) {
-                itemDiv.style.color = 'var(--danger-color)';
-                itemDiv.innerText += ' FAILED';
+                fill.style.background = 'var(--danger-color)';
+                fill.style.width = '100%';
+                status.innerText = 'ERR';
+                status.style.color = 'var(--danger-color)';
             }
         }
-        
-        // Setup simple global progress listener
-        window.api.onUploadProgress((data) => {
-             // This updates the most recent progress bar roughly
-             const bars = document.querySelectorAll('.progress-fill');
-             if(bars.length > 0) {
-                 const lastBar = bars[bars.length - 1];
-                 if(lastBar.style.backgroundColor !== 'var(--success-color)') {
-                     lastBar.style.width = ((data.current / data.total) * 100) + '%';
-                 }
-             }
-        });
 
         async function downloadFile(id) {
-            if(!confirm('Download?')) return;
             showLoading(true);
-            const res = await window.api.downloadFile(id);
+            constVk = await window.api.downloadFile(id);
             showLoading(false);
-            if(res.error) alert('Error: ' + res.error);
-            else alert('Saved to: ' + res.savePath);
+            if(Vk.error) alert('Error: ' + Vk.error);
+            else alert('Saved to: ' + Vk.savePath);
         }
 
         async function deleteFile(id) {
-            if(!confirm('Delete permanently?')) return;
+            if(!confirm('Permanently delete this file?')) return;
             const res = await window.api.deleteFile(id);
             if(res.success) refreshFiles();
         }
@@ -477,12 +765,16 @@
             showLoading(true);
             const res = await window.api.updateAccount({ username: u, password: p });
             showLoading(false);
-            if(res.success) alert('Account updated!');
+            if(res.success) { 
+                alert('Account updated!');
+                document.getElementById('new-username').value = '';
+                document.getElementById('new-password').value = '';
+            }
             else alert('Error: ' + res.error);
         }
 
         async function deleteAllFiles() {
-            if(!confirm('DELETE ALL FILES? This cannot be undone.')) return;
+            if(!confirm('WARNING: This will permanently delete ALL your files. This cannot be undone. Continue?')) return;
             showLoading(true);
             const res = await window.api.deleteAllFiles(currentUser.userId);
             showLoading(false);
@@ -491,13 +783,32 @@
         }
 
         async function deleteAccount() {
-            if(!confirm('DELETE ACCOUNT? This is the end.')) return;
+            if(!confirm('WARNING: This will delete your account and ALL data. Are you sure?')) return;
             showLoading(true);
             const res = await window.api.deleteAccount();
             showLoading(false);
-            if(res.success) location.reload(); // Logout/Reset
+            if(res.success) location.reload(); 
             else alert('Error: ' + res.error);
         }
+
+        async function logout() {
+            await window.api.logout();
+            location.reload();
+        }
+
+        async function initApp() {
+            showLoading(true);
+            const res = await window.api.checkAuth();
+            showLoading(false);
+            if(res.success && res.data) {
+                currentUser = res.data;
+                document.getElementById('auth-screen').style.display = 'none';
+                document.getElementById('app-screen').style.display = 'flex';
+                loadProfile();
+            }
+        }
+
+        initApp();
     </script>
 </body>
 </html>

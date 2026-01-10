@@ -24,10 +24,28 @@ function log(level, action, message) {
     console.log(`[${timestamp}] [${level}] [ACTION:${action}] ${message}`);
 }
 
+const CREDENTIALS_PATH = path.join(app.getPath('userData'), 'credentials.json');
+
+function saveCredentials(data) {
+    fs.writeFileSync(CREDENTIALS_PATH, JSON.stringify(data));
+}
+
+function getSavedCredentials() {
+    if (fs.existsSync(CREDENTIALS_PATH)) {
+        try {
+            return JSON.parse(fs.readFileSync(CREDENTIALS_PATH));
+        } catch (e) { return null; }
+    }
+    return null;
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 800,
         height: 600,
+        frame: false,
+        backgroundColor: '#000000',
+        titleBarStyle: 'hidden',
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
@@ -39,6 +57,43 @@ function createWindow() {
 }
 
 app.whenReady().then(createWindow);
+
+// -- Window Controls --
+ipcMain.handle('window-minimize', () => mainWindow.minimize());
+ipcMain.handle('window-close', () => mainWindow.close());
+
+ipcMain.handle('check-auth', async () => {
+    const creds = getSavedCredentials();
+    if (creds && creds.username && creds.password) {
+        // Auto-login logic
+        log('INFO', 'AUTH', `Auto-login for ${creds.username}`);
+        try {
+            const response = await fetch(`${USERDATA_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(creds)
+            });
+            const data = await response.json();
+            if (data.token) {
+                userData = data;
+                connectToContentServer(data.userId);
+                startPinging(data.token);
+                return { success: true, data };
+            }
+        } catch (e) {
+            log('WARN', 'AUTH', `Auto-login failed: ${e.message}`);
+        }
+    }
+    return { success: false };
+});
+
+ipcMain.handle('logout', () => {
+    if (fs.existsSync(CREDENTIALS_PATH)) fs.unlinkSync(CREDENTIALS_PATH);
+    userData = {};
+    if (ws) ws.close();
+    if (pingInterval) clearInterval(pingInterval);
+    return { success: true };
+});
 
 ipcMain.handle('login', async (event, { username, password }) => {
     log('INFO', 'LOGIN', `Attempting login for ${username}`);
@@ -52,6 +107,7 @@ ipcMain.handle('login', async (event, { username, password }) => {
         const data = await response.json();
         if (data.token) {
             userData = data;
+            saveCredentials({ username, password });
             connectToContentServer(data.userId);
             startPinging(data.token);
             log('INFO', 'LOGIN', `Login successful for ${username}`);
@@ -77,6 +133,7 @@ ipcMain.handle('register', async (event, { username, password }) => {
         const data = await response.json();
         if (data.token) {
             userData = data;
+            saveCredentials({ username, password });
             connectToContentServer(data.userId);
             startPinging(data.token);
             log('INFO', 'REGISTER', `Registration successful for ${username}`);
