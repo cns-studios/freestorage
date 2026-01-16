@@ -44,17 +44,16 @@ app.post('/register', async (req, res) => {
         const peerSecret = crypto.randomBytes(32).toString('hex');
         
         db.run(
-            'INSERT INTO users (username, password_hash, encryption_key_encrypted, peer_secret) VALUES (?, ?, ?, ?)',
-            [username, passwordHash, encryptionKey, peerSecret],
+            'INSERT INTO users (username, password_hash, encryption_key_encrypted, peer_secret, status) VALUES (?, ?, ?, ?, ?)',
+            [username, passwordHash, encryptionKey, peerSecret, 'pending'],
             function(err) {
                 if (err) {
                     log('ERROR', req, `Registration failed for ${username}: ${err.message}`);
                     return res.status(400).json({ error: 'Username exists or other error' });
                 }
                 
-                const token = jwt.sign({ userId: this.lastID }, SECRET_KEY);
-                log('INFO', req, `New user registered: ${username} (ID: ${this.lastID})`);
-                res.json({ token, userId: this.lastID, encryptionKey, peerSecret });
+                log('INFO', req, `New user registered (Pending Approval): ${username} (ID: ${this.lastID})`);
+                res.json({ message: 'Registration successful. Account pending admin approval.' });
             }
         );
     } catch (e) {
@@ -80,6 +79,11 @@ app.post('/login', async (req, res) => {
         if (!valid) {
             log('WARN', req, `Login failed: Invalid password for ${username}`);
             return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        if (user.status !== 'approved') {
+            log('WARN', req, `Login failed: Account pending approval for ${username}`);
+            return res.status(403).json({ error: 'Account pending admin approval.' });
         }
         
         const token = jwt.sign({ userId: user.id }, SECRET_KEY);

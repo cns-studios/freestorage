@@ -18,9 +18,14 @@ db.serialize(() => {
       total_online_minutes INTEGER DEFAULT 0,
       chunks_stored INTEGER DEFAULT 0,
       last_ping_time INTEGER,
+      status TEXT DEFAULT 'pending',
       created_at INTEGER DEFAULT (strftime('%s', 'now'))
     )
   `);
+
+  db.run("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'pending'", (err) => {
+      // Ignore error if column exists
+  });
 
   db.run(`
     CREATE TABLE IF NOT EXISTS ping_logs (
