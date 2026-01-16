@@ -41,15 +41,15 @@ app.get('/', (req, res) => {
                     }
                     let html = '<table><thead><tr><th>ID</th><th>Username</th><th>Registered</th><th>Actions</th></tr></thead><tbody>';
                     users.forEach(u => {
-                        html += '<tr>' +
-                            '<td>' + u.id + '</td>' +
-                            '<td>' + u.username + '</td>' +
-                            '<td>' + new Date(u.created_at * 1000).toLocaleString() + '</td>' +
-                            '<td>' +
-                                '<button class="btn approve" onclick="act(' + u.id + ', \'approve\')">Approve</button>' +
-                                '<button class="btn reject" onclick="act(' + u.id + ', \'reject\')">Reject</button>' +
-                            '</td>' +
-                        '</tr>';
+                        html += \`<tr>
+                            <td>\${u.id}</td>
+                            <td>\${u.username}</td>
+                            <td>\${new Date(u.created_at * 1000).toLocaleString()}</td>
+                            <td>
+                                <button class="btn approve" onclick="act(\${u.id}, 'approve')">Approve</button>
+                                <button class="btn reject" onclick="act(\${u.id}, 'reject')">Reject</button>
+                            </td>
+                        </tr>\`;
                     });
                     html += '</tbody></table>';
                     list.innerHTML = html;

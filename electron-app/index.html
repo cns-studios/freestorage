@@ -596,12 +596,18 @@
             const res = await window.api.register({ username: u, password: p });
             showLoading(false);
             if(res.success) {
-                currentUser = res.data;
-                document.getElementById('auth-screen').style.display = 'none';
-                document.getElementById('app-screen').style.display = 'flex';
-                loadProfile();
+                if (res.pending) {
+                    document.getElementById('auth-msg').innerText = res.message;
+                    document.getElementById('auth-msg').style.color = 'var(--text-primary)';
+                } else {
+                    currentUser = res.data;
+                    document.getElementById('auth-screen').style.display = 'none';
+                    document.getElementById('app-screen').style.display = 'flex';
+                    loadProfile();
+                }
             } else {
                 document.getElementById('auth-msg').innerText = res.error;
+                document.getElementById('auth-msg').style.color = 'var(--danger-color)';
             }
         }
 

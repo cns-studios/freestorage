@@ -136,6 +136,9 @@ ipcMain.handle('register', async (event, { username, password }) => {
             startPinging(data.token);
             log('INFO', 'REGISTER', `Registration successful for ${username}`);
             return { success: true, data };
+        } else if (data.message) {
+            log('INFO', 'REGISTER', `Registration pending: ${data.message}`);
+            return { success: true, message: data.message, pending: true };
         }
         log('WARN', 'REGISTER', `Registration failed: ${data.error}`);
         return { success: false, error: data.error };
