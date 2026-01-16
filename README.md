@@ -49,7 +49,7 @@ npm run init-db
 npm start
 ```
 Runs on port 8086 (default).
-*Note: Ensure the `data` directory exists or is created by the init script.*
+*Note: Ensure the data directory exists or is created by the init script.*
 
 #### 2. Content Server
 
@@ -60,7 +60,7 @@ npm run init-db
 npm start
 ```
 Runs on port 8085 (HTTP) and 3002 (WebSocket).
-*Note: Ensure the `data` directory exists or is created by the init script.*
+*Note: Ensure the data directory exists or is created by the init script.*
 
 #### 3. Host Server
 
@@ -78,10 +78,10 @@ To run the simulation of storage nodes:
 ```bash
 cd bot
 npm install
-./run_bots.sh 5  # Starts 5 bot instances
+./run_bots.sh 5
 ```
-This script starts multiple bot instances defined in `index.js` or the shell script itself.
-*Note: This script uses Docker to spawn bot containers. If you want to run a single bot node without Docker, you can run `node index.js` directly, optionally passing a suffix argument.*
+This script starts multiple bot instances defined in index.js or the shell script itself.
+*Note: This script uses Docker to spawn bot containers. If you want to run a single bot node without Docker, you can run node index.js directly, optionally passing a suffix argument.*
 
 #### 5. Desktop Client (Electron)
 
@@ -93,14 +93,46 @@ npm install
 npm start
 ```
 
-## Usage
+## Admin & User Management
 
-1.  **Start the Servers:** Ensure Userdata and Content servers are running (via Docker or manual).
-2.  **Start the Bots:** Run the bot script to ensure there are peers available to store data.
-3.  **Launch the App:** Open the Electron Desktop App.
-4.  **Register:** Create a new account.
-5.  **Upload:** Drag and drop files or use the upload button. Files are encrypted, chunked, and distributed to available bots.
-6.  **Download:** Retrieve your files from the network. The client handles reassembly and decryption.
+### User Approval Process
+For security and network management, all new user registrations are placed in a pending state. Users cannot log in or use the network until an administrator manually approves their account.
+
+### Admin Tool
+To manage pending user requests, use the included Admin Tool. This tool is intended to be run manually from the command line.
+
+1. Navigate to the userdata-server directory:
+   ```bash
+   cd userdata-server
+   ```
+2. Start the admin interface:
+   ```bash
+   npm run admin
+   ```
+3. Access the web-based management panel at: http://localhost:3004
+
+From here, you can approve or reject (delete) pending user registrations.
+
+## Build and Release
+
+The project includes a GitHub Actions workflow to automatically build the Electron application for multiple platforms and create a new release.
+
+### Triggering a Release
+To build and publish a new version:
+1. Update the version in `electron-app/package.json`.
+2. Push a tag starting with "v" to the repository:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+
+### Target Platforms
+The build process generates production-ready binaries for:
+- **Windows:** x64, x86, and ARM64 (.exe)
+- **macOS:** Intel and Apple Silicon (.dmg and .zip)
+- **Linux:** .deb, .rpm, .pacman, and .AppImage
+
+*Note: As the application binaries are not code-signed, users may encounter security warnings during installation. Instructions for bypassing these warnings are provided in the release description.*
 
 ## Technical Details
 

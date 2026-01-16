@@ -10,7 +10,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const APP_DOWNLOAD_LINK = 'https://github.com/user/freestorage/releases/latest';
+const APP_DOWNLOAD_LINK = 'https://github.com/cns-studios/freestorage/releases/latest';
 
 app.get('/download-app', (req, res) => {
     res.redirect(APP_DOWNLOAD_LINK);
