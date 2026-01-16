@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Usage: ./run_bots.sh <number_of_bots> [action: start|stop|clean]
 NUM_BOTS=${1:-1}
 ACTION=${2:-start}
 BASE_PORT=6000
@@ -21,22 +20,18 @@ if [ "$ACTION" == "clean" ]; then
     exit 0
 fi
 
-# Build the bot image
 echo "Building bot image..."
 docker build -t $IMAGE_NAME ./bot
 
-# Ensure network exists
 docker network inspect $NETWORK >/dev/null 2>&1 || docker network create $NETWORK
 
 for i in $(seq 1 $NUM_BOTS); do
     PORT=$((BASE_PORT + i))
     NAME="bot$i"
     
-    # Create a local directory for this bot's data
     DATA_DIR="$(pwd)/bot/instances/$NAME"
     mkdir -p "$DATA_DIR/storage"
     
-    # Ensure credentials file exists so it's not created as a directory by docker
     touch "$DATA_DIR/credentials.json"
     
     echo "Starting $NAME: Host Port $PORT -> Container Port 6001"

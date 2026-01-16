@@ -10,14 +10,12 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Mock download link for the app
 const APP_DOWNLOAD_LINK = 'https://github.com/user/freestorage/releases/latest';
 
 app.get('/download-app', (req, res) => {
     res.redirect(APP_DOWNLOAD_LINK);
 });
 
-// Proxy login to userdata-server and set cookies
 app.post('/api/login', async (req, res) => {
     try {
         const response = await fetch(`${USERDATA_SERVER_URL}/login`, {
@@ -28,7 +26,6 @@ app.post('/api/login', async (req, res) => {
         const data = await response.json();
         
         if (data.token) {
-            // Set cookies for 7 days
             res.cookie('token', data.token, { maxAge: 7 * 24 * 60 * 60 * 1000, httpOnly: false });
             res.cookie('userId', data.userId, { maxAge: 7 * 24 * 60 * 60 * 1000, httpOnly: false });
             res.cookie('encryptionKey', data.encryptionKey, { maxAge: 7 * 24 * 60 * 60 * 1000, httpOnly: false });

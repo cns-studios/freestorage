@@ -13,7 +13,6 @@ contextBridge.exposeInMainWorld('api', {
     deleteAllFiles: (userId) => ipcRenderer.invoke('delete-all-files', userId),
     onUploadProgress: (callback) => ipcRenderer.on('upload-progress', (event, data) => callback(data)),
     
-    // Auth & Window
     checkAuth: () => ipcRenderer.invoke('check-auth'),
     logout: () => ipcRenderer.invoke('logout'),
     minimizeWindow: () => ipcRenderer.invoke('window-minimize'),

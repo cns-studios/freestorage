@@ -4,7 +4,6 @@ if (!fs.existsSync('./data')) fs.mkdirSync('./data');
 const db = new sqlite3.Database('./data/userdata.db');
 
 db.serialize(() => {
-  // Enable WAL mode
   db.run('PRAGMA journal_mode=WAL;');
 
   db.run(`

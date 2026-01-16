@@ -58,14 +58,12 @@ function createWindow() {
 
 app.whenReady().then(createWindow);
 
-// -- Window Controls --
 ipcMain.handle('window-minimize', () => mainWindow.minimize());
 ipcMain.handle('window-close', () => mainWindow.close());
 
 ipcMain.handle('check-auth', async () => {
     const creds = getSavedCredentials();
     if (creds && creds.username && creds.password) {
-        // Auto-login logic
         log('INFO', 'AUTH', `Auto-login for ${creds.username}`);
         try {
             const response = await fetch(`${USERDATA_URL}/login`, {
@@ -155,12 +153,9 @@ ipcMain.handle('upload-file', async (event, { filePath, relativePath }) => {
         const stats = fs.statSync(filePath);
         const fileSize = stats.size;
         
-        // Calculate encrypted size: Original + Padding + IV (16 bytes)
-        // PKCS7 padding adds 1 to 16 bytes. If size % 16 === 0, it adds 16 bytes.
         const padding = 16 - (fileSize % 16);
         const encryptedSize = fileSize + padding + 16;
         
-        // 10MB chunks
         const CHUNK_SIZE = 10 * 1024 * 1024;
         const totalChunks = Math.ceil(encryptedSize / CHUNK_SIZE);
         
@@ -184,18 +179,15 @@ ipcMain.handle('upload-file', async (event, { filePath, relativePath }) => {
         
         const { fileId } = await initResponse.json();
         
-        // Prepare crypto stream
         const key = Buffer.from(userData.encryptionKey, 'hex');
         const iv = crypto.randomBytes(16);
         const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
         
         const readStream = fs.createReadStream(filePath);
         
-        // We need to chunk the OUTPUT of the cipher
-        let buffer = Buffer.from(iv); // Start with IV
+        let buffer = Buffer.from(iv);
         let chunkIndex = 0;
         
-        // Helper to upload a chunk
         const uploadChunk = async (data, idx) => {
             const chunkHash = hashChunk(data);
             const res = await fetch(`${CONTENT_URL}/upload/chunk?fileId=${fileId}&chunkIndex=${idx}&chunkHash=${chunkHash}`, {
@@ -207,7 +199,6 @@ ipcMain.handle('upload-file', async (event, { filePath, relativePath }) => {
             event.sender.send('upload-progress', { current: idx + 1, total: totalChunks });
         };
 
-        // Process stream
         for await (const chunk of readStream) {
             const encryptedChunk = cipher.update(chunk);
             buffer = Buffer.concat([buffer, encryptedChunk]);
@@ -219,11 +210,9 @@ ipcMain.handle('upload-file', async (event, { filePath, relativePath }) => {
             }
         }
         
-        // Finalize encryption
         const finalEncrypted = cipher.final();
         buffer = Buffer.concat([buffer, finalEncrypted]);
         
-        // Upload remaining buffer
         if (buffer.length > 0) {
             await uploadChunk(buffer, chunkIndex++);
         }
@@ -317,7 +306,6 @@ ipcMain.handle('download-file', async (event, fileId) => {
                 }
             }
 
-            // Verify integrity
             const actualHash = hashChunk(chunkBuffer);
             if (actualHash !== chunk.chunkHash) {
                 log('ERROR', 'DOWNLOAD', `Integrity check failed for chunk ${chunk.chunkId}`);

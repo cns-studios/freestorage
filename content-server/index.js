@@ -262,10 +262,8 @@ function handleChunkStored(chunkId, peerId) {
         (err) => {
             if (err) return; 
 
-            // Increment storage proof for peer
             db.run('UPDATE peers SET chunks_stored = chunks_stored + 1 WHERE id = ?', [peerId]);
             
-            // Sync with userdata server
             db.get('SELECT user_id, chunks_stored FROM peers WHERE id = ?', [peerId], (err, peer) => {
                 if (peer) {
                     fetch(`${USERDATA_SERVER_URL}/sync-contribution`, {
@@ -303,7 +301,6 @@ function handleChunkMissing(chunkId, peerId, requestId, purpose) {
                 db.run('UPDATE chunks SET replica_count = ? WHERE id = ?', [count, chunkId]);
                 log('WARN', null, `Chunk ${chunkId} removed from Peer ${peerId}. New replica count: ${count}`);
                 
-                // If there was an active request, try to find another provider immediately
                 if (requestId) {
                     if (purpose === 'cache') {
                         cacheChunkLocally(chunkId);
@@ -312,7 +309,6 @@ function handleChunkMissing(chunkId, peerId, requestId, purpose) {
                     }
                 }
 
-                // If count is low, trigger an attempt to cache and redistribute
                 if (count < 5) {
                     cacheChunkLocally(chunkId);
                 }

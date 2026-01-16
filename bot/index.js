@@ -8,7 +8,6 @@ const STORAGE_DIR = path.join(__dirname, `storage${suffix}`);
 const CREDENTIALS_PATH = path.join(__dirname, `credentials${suffix}.json`);
 const WS_URL = process.env.WS_URL || 'ws://localhost:3002';
 
-// Ensure storage directory exists
 if (!fs.existsSync(STORAGE_DIR)) {
     fs.mkdirSync(STORAGE_DIR, { recursive: true });
 }
@@ -23,7 +22,6 @@ function getCredentials() {
         }
     }
 
-    // Generate a random UserID and PeerSecret
     const newUserId = Math.floor(Math.random() * 9000000) + 1000000;
     const newPeerSecret = crypto.randomBytes(32).toString('hex');
     const creds = { userId: newUserId, peerSecret: newPeerSecret };
@@ -75,7 +73,6 @@ function authenticate() {
     }
 }
 
-// Re-authenticate every 5 minutes to keep "last_seen" updated on server
 setInterval(authenticate, 5 * 60 * 1000);
 
 function handleMessage(msg) {
@@ -94,7 +91,6 @@ function handleMessage(msg) {
             break;
             
         case 'chunk_data':
-             // Bots don't request chunks, but might receive them if we added logic later.
              break;
     }
 }
@@ -108,7 +104,6 @@ function handleStoreChunk(msg) {
         console.log(`Stored chunk: ${chunkId}`);
 
         if (myPeerId) {
-            // Confirm storage to server
             ws.send(JSON.stringify({
                 type: 'chunk_stored',
                 chunkId: chunkId,

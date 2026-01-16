@@ -34,16 +34,13 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #555; }
 
-        /* Icons */
         .icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 
-        /* Auth Screen */
         #auth-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -118,7 +115,6 @@
             border-color: var(--danger-color); 
         }
 
-        /* App Layout */
         #app-screen { display: none; width: 100%; height: 100%; }
         
         .sidebar {
@@ -176,15 +172,12 @@
             background: var(--bg-color);
         }
 
-        /* Headers */
         h1 { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 2rem; margin-top: 0; color: var(--text-primary); }
         
-        /* Tabs */
         .tab-content { display: none; animation: fadeIn 0.2s ease; }
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Dashboard */
         .stats-grid { 
             display: grid; 
             grid-template-columns: repeat(3, 1fr); 
@@ -204,7 +197,6 @@
         .stat-label { color: var(--text-secondary); font-size: 0.875rem; font-weight: 500; }
         .stat-value { font-size: 1.75rem; font-weight: 600; color: var(--text-primary); margin-top: auto; letter-spacing: -0.03em; }
 
-        /* File List */
         .file-table-container {
             border: 1px solid var(--border-color);
             border-radius: 8px;
@@ -261,7 +253,6 @@
         .action-btn:hover { border-color: var(--text-secondary); color: var(--text-primary); background: var(--hover-bg); }
         .action-btn.delete:hover { border-color: var(--text-secondary); color: var(--text-primary); background: var(--hover-bg); }
 
-        /* Upload Area */
         .upload-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -312,7 +303,6 @@
         .progress-fill { height: 100%; background: var(--text-primary); width: 0%; transition: width 0.2s; }
         .progress-status { font-size: 0.75rem; color: var(--text-secondary); width: 40px; text-align: right; }
 
-        /* Settings */
         .settings-section {
             border: 1px solid var(--border-color);
             border-radius: 8px;
@@ -334,7 +324,6 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Custom Title Bar */
         #title-bar {
             height: 36px;
             background: var(--bg-color);
@@ -343,7 +332,7 @@
             align-items: center;
             justify-content: space-between;
             padding: 0 10px;
-            -webkit-app-region: drag; /* Make draggable */
+            -webkit-app-region: drag;
             user-select: none;
             position: fixed;
             top: 0; left: 0; right: 0;
@@ -378,7 +367,6 @@
         .control-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
         .control-btn.close:hover { background: var(--danger-color); color: white; }
 
-        /* Adjust body for fixed title bar */
         body { padding-top: 36px; }
         #auth-screen, #app-screen { height: calc(100vh - 36px); top: 36px; }
     </style>
@@ -388,7 +376,6 @@
         <div class="loader"></div>
     </div>
 
-    <!-- Custom Title Bar -->
     <div id="title-bar">
         <div class="title-drag-area">
              <div class="logo-icon" style="width: 20px; height: 20px; background: transparent;">
@@ -406,7 +393,6 @@
         </div>
     </div>
 
-    <!-- Auth Screen -->
     <div id="auth-screen">
         <div class="auth-card">
             <div class="auth-header">
@@ -433,7 +419,6 @@
         </div>
     </div>
 
-    <!-- Main App -->
     <div id="app-screen">
         <div class="sidebar">
             <div class="logo">
@@ -467,7 +452,6 @@
         </div>
 
         <div class="main-content">
-            <!-- Dashboard Tab -->
             <div id="dashboard" class="tab-content active">
                 <h1>Overview</h1>
                 <div class="stats-grid">
@@ -486,7 +470,6 @@
                 </div>
             </div>
 
-            <!-- Files Tab -->
             <div id="files" class="tab-content">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.5rem;">
                     <h1>Files</h1>
@@ -510,7 +493,6 @@
                 </div>
             </div>
 
-            <!-- Upload Tab -->
             <div id="upload" class="tab-content">
                 <h1>Upload</h1>
                 
@@ -537,7 +519,6 @@
                 <div id="upload-status"></div>
             </div>
 
-            <!-- Settings Tab -->
             <div id="settings" class="tab-content">
                 <h1>Settings</h1>
                 
@@ -565,7 +546,6 @@
         let currentUser = null;
         let profileData = {};
 
-        // -- Navigation --
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -591,7 +571,6 @@
             document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
         }
 
-        // -- Auth --
         async function login() {
             const u = document.getElementById('username').value;
             const p = document.getElementById('password').value;
@@ -626,7 +605,6 @@
             }
         }
 
-        // -- Data --
         async function loadProfile() {
             if(!currentUser) return;
             const profile = await window.api.getProfile(currentUser.token);
@@ -636,9 +614,8 @@
             document.getElementById('storage-used').innerText = profile.storage_used_gb.toFixed(2) + ' GB';
             document.getElementById('storage-limit').innerText = profile.storage_limit_gb + ' GB';
             
-            // Calc time to next
             const mins = profile.total_online_minutes;
-            const target = 4320; // 72h
+            const target = 4320;
             const remaining = target - mins;
             const hoursLeft = Math.floor(remaining / 60);
             const minsLeft = remaining % 60;
@@ -678,7 +655,6 @@
             }
         }
 
-        // -- Actions --
         async function handleFileSelect(input) {
             if(!input.files[0]) return;
             await processUpload(input.files[0]);
@@ -691,7 +667,6 @@
             
             for(let i=0; i<input.files.length; i++) {
                 const file = input.files[i];
-                // webkitRelativePath contains the folder path
                 await processUpload(file, file.webkitRelativePath);
             }
         }
@@ -708,16 +683,12 @@
                 </div>
                 <div class="progress-status">0%</div>
             `;
-            statusDiv.prepend(itemDiv); // Add new items to top
+            statusDiv.prepend(itemDiv);
             
             const fill = itemDiv.querySelector('.progress-fill');
             const status = itemDiv.querySelector('.progress-status');
 
-            // Simplified progress tracking
             window.api.onUploadProgress((data) => {
-                 // Note: this is a global listener for ALL uploads, 
-                 // which is a limitation of this simple prototype.
-                 // We will update the *latest* bar for visual feedback.
                  const pct = Math.round((data.current / data.total) * 100);
                  if (fill.style.width !== '100%') {
                     fill.style.width = pct + '%';
@@ -744,7 +715,7 @@
 
         async function downloadFile(id) {
             showLoading(true);
-            constVk = await window.api.downloadFile(id);
+            const Vk = await window.api.downloadFile(id);
             showLoading(false);
             if(Vk.error) alert('Error: ' + Vk.error);
             else alert('Saved to: ' + Vk.savePath);
@@ -756,7 +727,6 @@
             if(res.success) refreshFiles();
         }
 
-        // -- Settings --
         async function updateAccount() {
             const u = document.getElementById('new-username').value;
             const p = document.getElementById('new-password').value;
