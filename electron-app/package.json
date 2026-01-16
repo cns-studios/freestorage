@@ -2,6 +2,15 @@
   "name": "freestorage-desktop",
   "version": "1.0.0",
   "description": "Desktop client for FreeStorage",
+  "author": {
+    "name": "FreeStorage Maintainers",
+    "email": "maintainers@freestorage.local"
+  },
+  "homepage": "https://github.com/aaron/freestorage",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aaron/freestorage.git"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
