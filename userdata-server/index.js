@@ -265,5 +265,5 @@ app.get('/profile', authenticateToken, (req, res) => {
     });
 });
 
-const PORT = process.env.PORT || 8086;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => log('INFO', null, `Userdata server running on port ${PORT}`));

@@ -3,8 +3,8 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 8087;
-const USERDATA_SERVER_URL = process.env.USERDATA_SERVER_URL || 'http://localhost:8086';
+const PORT = process.env.PORT || 3000;
+const USERDATA_SERVER_URL = process.env.USERDATA_SERVER_URL || 'http://localhost:3001';
 
 app.use(express.json());
 app.use(cookieParser());

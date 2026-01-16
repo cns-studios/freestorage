@@ -18,8 +18,8 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.raw({ type: 'application/octet-stream', limit: '50mb' }));
 
 const WS_PORT = process.env.WS_PORT || 3002;
-const HTTP_PORT = process.env.HTTP_PORT || 8085;
-const USERDATA_SERVER_URL = process.env.USERDATA_SERVER_URL || 'http://localhost:8086';
+const HTTP_PORT = process.env.HTTP_PORT || 3003;
+const USERDATA_SERVER_URL = process.env.USERDATA_SERVER_URL || 'http://localhost:3001';
 
 const wss = new WebSocket.Server({ port: WS_PORT });
 const activePeers = new Map();
@@ -268,7 +268,7 @@ function handleChunkStored(chunkId, peerId) {
             // Sync with userdata server
             db.get('SELECT user_id, chunks_stored FROM peers WHERE id = ?', [peerId], (err, peer) => {
                 if (peer) {
-                    fetch(`${USERDATA_SERVER_URL}/sync-contribution', {
+                    fetch(`${USERDATA_SERVER_URL}/sync-contribution`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
@@ -335,7 +335,7 @@ function checkFileCompletion(chunkId) {
                         log('INFO', null, `File complete: ${chunk.file_id}`);
 
                         const sizeGb = file.file_size_bytes / (1024 * 1024 * 1024);
-                        fetch(`${USERDATA_SERVER_URL}/update-storage', {
+                        fetch(`${USERDATA_SERVER_URL}/update-storage`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ userId: file.user_id, addGb: sizeGb, apiKey: INTERNAL_API_KEY })
@@ -370,7 +370,7 @@ app.delete('/files/:fileId', authenticateToken, (req, res) => {
             }
             
             const sizeGb = file.file_size_bytes / (1024 * 1024 * 1024);
-            fetch(`${USERDATA_SERVER_URL}/update-storage', {
+            fetch(`${USERDATA_SERVER_URL}/update-storage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: file.user_id, addGb: -sizeGb, apiKey: INTERNAL_API_KEY })
@@ -403,7 +403,7 @@ app.delete('/files/user/:userId/all', authenticateToken, (req, res) => {
             
             if (totalSize > 0) {
                 const sizeGb = totalSize / (1024 * 1024 * 1024);
-                fetch(`${USERDATA_SERVER_URL}/update-storage', {
+                fetch(`${USERDATA_SERVER_URL}/update-storage`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, addGb: -sizeGb, apiKey: INTERNAL_API_KEY })

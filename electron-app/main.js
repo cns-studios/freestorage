@@ -152,9 +152,17 @@ ipcMain.handle('upload-file', async (event, { filePath, relativePath }) => {
     log('INFO', 'UPLOAD', `Starting upload: ${filename}`);
     
     try {
-        const fileData = fs.readFileSync(filePath);
-        const encrypted = encryptData(fileData, userData.encryptionKey);
-        const chunks = chunkData(encrypted, 10 * 1024 * 1024);
+        const stats = fs.statSync(filePath);
+        const fileSize = stats.size;
+        
+        // Calculate encrypted size: Original + Padding + IV (16 bytes)
+        // PKCS7 padding adds 1 to 16 bytes. If size % 16 === 0, it adds 16 bytes.
+        const padding = 16 - (fileSize % 16);
+        const encryptedSize = fileSize + padding + 16;
+        
+        // 10MB chunks
+        const CHUNK_SIZE = 10 * 1024 * 1024;
+        const totalChunks = Math.ceil(encryptedSize / CHUNK_SIZE);
         
         const initResponse = await fetch(`${CONTENT_URL}/upload/init`, {
             method: 'POST',
@@ -165,23 +173,59 @@ ipcMain.handle('upload-file', async (event, { filePath, relativePath }) => {
             body: JSON.stringify({
                 userId: userData.userId,
                 filename: filename,
-                fileSize: encrypted.length,
-                totalChunks: chunks.length
+                fileSize: encryptedSize,
+                totalChunks: totalChunks
             })
         });
         
+        if (!initResponse.ok) {
+            throw new Error(`Init failed: ${initResponse.statusText}`);
+        }
+        
         const { fileId } = await initResponse.json();
         
-        for (let i = 0; i < chunks.length; i++) {
-            const chunkHash = hashChunk(chunks[i]);
-            
-            await fetch(`${CONTENT_URL}/upload/chunk?fileId=${fileId}&chunkIndex=${i}&chunkHash=${chunkHash}`, {
+        // Prepare crypto stream
+        const key = Buffer.from(userData.encryptionKey, 'hex');
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+        
+        const readStream = fs.createReadStream(filePath);
+        
+        // We need to chunk the OUTPUT of the cipher
+        let buffer = Buffer.from(iv); // Start with IV
+        let chunkIndex = 0;
+        
+        // Helper to upload a chunk
+        const uploadChunk = async (data, idx) => {
+            const chunkHash = hashChunk(data);
+            const res = await fetch(`${CONTENT_URL}/upload/chunk?fileId=${fileId}&chunkIndex=${idx}&chunkHash=${chunkHash}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/octet-stream' },
-                body: chunks[i]
+                body: data
             });
+            if (!res.ok) throw new Error(`Chunk ${idx} upload failed`);
+            event.sender.send('upload-progress', { current: idx + 1, total: totalChunks });
+        };
+
+        // Process stream
+        for await (const chunk of readStream) {
+            const encryptedChunk = cipher.update(chunk);
+            buffer = Buffer.concat([buffer, encryptedChunk]);
             
-            event.sender.send('upload-progress', { current: i + 1, total: chunks.length });
+            while (buffer.length >= CHUNK_SIZE) {
+                const toUpload = buffer.slice(0, CHUNK_SIZE);
+                buffer = buffer.slice(CHUNK_SIZE);
+                await uploadChunk(toUpload, chunkIndex++);
+            }
+        }
+        
+        // Finalize encryption
+        const finalEncrypted = cipher.final();
+        buffer = Buffer.concat([buffer, finalEncrypted]);
+        
+        // Upload remaining buffer
+        if (buffer.length > 0) {
+            await uploadChunk(buffer, chunkIndex++);
         }
         
         log('INFO', 'UPLOAD', `Upload complete: ${filename} (${fileId})`);
