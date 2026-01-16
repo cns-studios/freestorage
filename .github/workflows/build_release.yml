@@ -19,8 +19,14 @@ jobs:
       - name: Install Dependencies
         working-directory: ./electron-app
         run: npm install
+      - name: Install Linux Build Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools rpm
       - name: Build Linux
         working-directory: ./electron-app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build -- --linux
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
@@ -54,6 +60,8 @@ jobs:
         run: npm install
       - name: Build Windows
         working-directory: ./electron-app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build -- --win
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
@@ -74,6 +82,8 @@ jobs:
         run: npm install
       - name: Build macOS
         working-directory: ./electron-app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build -- --mac -c.mac.identity=null
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
