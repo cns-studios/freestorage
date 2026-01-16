@@ -1,0 +1,21 @@
+{
+  "name": "userdata-server",
+  "version": "1.0.0",
+  "description": "User authentication and tracking server for FreeStorage",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "init-db": "node init_db.js",
+    "admin": "node admin.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "express": "^4.22.1",
+    "jsonwebtoken": "^9.0.2",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
+}
