@@ -43,9 +43,41 @@ jobs:
             
             **⚠️ NOTICE: This app is not code-signed because certificates are expensive.**
             
-            *   **Windows:** If you see "Windows protected your PC", click **"More Info" -> "Run Anyway"**.
-            *   **macOS:** If you see "Unidentified Developer", **Right Click** the app -> **Open** -> **Open**.
-            *   **Linux:** It should just work.
+            ### Installation Instructions
+            
+            #### Windows
+            1. Download the `.exe` file.
+            2. Run the installer.
+            3. If you see "Windows protected your PC", click **"More Info"** then **"Run Anyway"**.
+            
+            #### macOS
+            1. Download the `.dmg` file.
+            2. Open it and drag the app to your **Applications** folder.
+            3. Double-click to open.
+            4. If you see "Unidentified Developer", click **OK**. Then **Right-Click** the app in Finder, select **Open**, and click **Open** in the dialog.
+            
+            #### Linux
+            
+            **Universal (Recommended):**
+            1. Download the `.AppImage` file.
+            2. Make it executable: `chmod +x freestorage-*.AppImage`
+            3. Run it: `./freestorage-*.AppImage`
+            
+            **Ubuntu / Debian / Mint:**
+            ```bash
+            sudo apt install ./freestorage-*.deb
+            ```
+            
+            **Fedora / RHEL:**
+            ```bash
+            sudo dnf install ./freestorage-*.rpm
+            ```
+            
+            **Arch Linux / Manjaro:**
+            ```bash
+            sudo pacman -U freestorage-*.pkg.tar.zst
+            ```
+            *(Note: If you encounter issues with the native package, please use the AppImage)*
             
             Enjoy the free storage!
 
