@@ -46,6 +46,7 @@ function createWindow() {
         frame: false,
         backgroundColor: '#000000',
         titleBarStyle: 'hidden',
+        icon: path.join(__dirname, 'build/icon.png'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
