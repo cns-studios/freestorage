@@ -75,7 +75,7 @@ jobs:
             
             **Arch Linux / Manjaro:**
             ```bash
-            sudo pacman -U freestorage-*.pkg.tar.zst
+            sudo pacman -U freestorage-*.pacman
             ```
             *(Note: If you encounter issues with the native package, please use the AppImage)*
             
