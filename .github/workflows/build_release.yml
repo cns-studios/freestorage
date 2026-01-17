@@ -60,22 +60,22 @@ jobs:
             
             **Universal (Recommended):**
             1. Download the `.AppImage` file.
-            2. Make it executable: `chmod +x freestorage-*.AppImage`
-            3. Run it: `./freestorage-*.AppImage`
+            2. Make it executable: `chmod +x freestorage-installer.AppImage`
+            3. Run it: `./freestorage-installer.AppImage`
             
             **Ubuntu / Debian / Mint:**
             ```bash
-            sudo apt install ./freestorage-*.deb
+            sudo apt install ./freestorage-installer.deb
             ```
             
             **Fedora / RHEL:**
             ```bash
-            sudo dnf install ./freestorage-*.rpm
+            sudo dnf install ./freestorage-installer.rpm
             ```
             
             **Arch Linux / Manjaro:**
             ```bash
-            sudo pacman -U freestorage-*.pacman
+            sudo pacman -U freestorage-installer.pacman
             ```
             *(Note: If you encounter issues with the native package, please use the AppImage)*
             
