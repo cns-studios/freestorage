@@ -54,6 +54,7 @@
       ]
     },
     "linux": {
+      "icon": "build/icon.png",
       "target": [
         "deb",
         "rpm",
