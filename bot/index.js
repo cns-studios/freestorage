@@ -66,10 +66,23 @@ function connect() {
     });
 }
 
-function authenticate() {
+function getFreeSpace() {
+    return new Promise((resolve) => {
+        fs.statfs(STORAGE_DIR, (err, stats) => {
+            if (err) {
+                resolve(0);
+            } else {
+                resolve(stats.bavail * stats.bsize);
+            }
+        });
+    });
+}
+
+async function authenticate() {
     if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'auth', userId, peerSecret }));
-        console.log('Sent authentication');
+        const freeStorage = await getFreeSpace();
+        ws.send(JSON.stringify({ type: 'auth', userId, peerSecret, freeStorage }));
+        console.log(`Sent authentication (Free Storage: ${(freeStorage / 1024 / 1024 / 1024).toFixed(2)} GB)`);
     }
 }
 

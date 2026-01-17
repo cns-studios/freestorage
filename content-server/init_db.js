@@ -52,6 +52,7 @@ db.serialize(() => {
       last_seen INTEGER,
       total_uptime_minutes INTEGER DEFAULT 0,
       chunks_stored INTEGER DEFAULT 0,
+      free_storage_bytes INTEGER DEFAULT 0,
       websocket_id TEXT
     )
   `);

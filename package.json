@@ -1,0 +1,28 @@
+{
+  "name": "freestorage",
+  "version": "1.0.0",
+  "description": "FreeStorage is a distributed, peer-to-peer experimental network designed for decentralized file storage. It utilizes a network of bots and community-run nodes to store data, with a central coordination system for authentication and peer discovery.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cns-studios/freestorage.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/cns-studios/freestorage/issues"
+  },
+  "homepage": "https://github.com/cns-studios/freestorage#readme",
+  "devDependencies": {
+    "sqlite3": "^5.1.7",
+    "ws": "^8.19.0"
+  }
+}

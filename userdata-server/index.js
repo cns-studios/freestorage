@@ -7,11 +7,27 @@ const crypto = require('crypto');
 const app = express();
 const fs = require('fs');
 if (!fs.existsSync('./data')) fs.mkdirSync('./data');
-const db = new sqlite3.Database('./data/userdata.db');
+const DB_PATH = process.env.DB_PATH || './data/userdata.db';
+const db = new sqlite3.Database(DB_PATH);
 
 db.run('PRAGMA journal_mode=WAL;');
 
 app.use(express.json());
+
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && (origin.endsWith('.cns-studios.com') || origin.includes('localhost'))) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
 
 const SECRET_KEY = 'YOUR_SUPER_SECRET_KEY';
 const INTERNAL_API_KEY = 'YOUR_INTERNAL_SERVICE_KEY';

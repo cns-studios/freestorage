@@ -1,6 +1,6 @@
-const USERDATA_URL = window.location.origin + '/api/userdata-server';
-const CONTENT_URL = window.location.origin + '/api/content-server';
-const WS_URL = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/api/content-server-ws';
+const USERDATA_URL = window.location.protocol + '//api.' + window.location.host;
+const CONTENT_URL = window.location.protocol + '//content.' + window.location.host;
+const WS_URL = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + 'ws.' + window.location.host;
 
 let ws = null;
 let currentUser = {};

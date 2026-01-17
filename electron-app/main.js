@@ -10,13 +10,26 @@ let userData = {};
 let pingInterval;
 const pendingDownloads = new Map();
 
-const USERDATA_URL = 'http://localhost:3001';
-const CONTENT_URL = 'http://localhost:3003';
-const WS_URL = 'ws://localhost:3002';
+const USERDATA_URL = 'https://api.freestorage.cns-studios.com';
+const CONTENT_URL = 'https://content.freestorage.cns-studios.com';
+const WS_URL = 'wss://ws.freestorage.cns-studios.com';
 
 const CHUNK_STORAGE_PATH = path.join(app.getPath('userData'), 'chunks');
 if (!fs.existsSync(CHUNK_STORAGE_PATH)) {
     fs.mkdirSync(CHUNK_STORAGE_PATH, { recursive: true });
+}
+
+function getFreeSpace() {
+    return new Promise((resolve) => {
+        if (fs.statfs) {
+            fs.statfs(CHUNK_STORAGE_PATH, (err, stats) => {
+                if (err) resolve(0);
+                else resolve(stats.bavail * stats.bsize);
+            });
+        } else {
+            resolve(10 * 1024 * 1024 * 1024);
+        }
+    });
 }
 
 function log(level, action, message) {
@@ -417,9 +430,15 @@ function connectToContentServer(userId) {
     if (ws) ws.close();
     ws = new WebSocket(WS_URL);
     
-    ws.on('open', () => {
-        ws.send(JSON.stringify({ type: 'auth', userId, peerSecret: userData.peerSecret }));
-        log('INFO', 'WS', 'Connected to content server');
+    ws.on('open', async () => {
+        const freeStorage = await getFreeSpace();
+        ws.send(JSON.stringify({ 
+            type: 'auth', 
+            userId, 
+            peerSecret: userData.peerSecret,
+            freeStorage: freeStorage
+        }));
+        log('INFO', 'WS', `Connected to content server (Free Space: ${(freeStorage / 1024 / 1024 / 1024).toFixed(2)} GB)`);
     });
     
     ws.on('message', (data) => {

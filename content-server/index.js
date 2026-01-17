@@ -7,7 +7,8 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const fs = require('fs');
 if (!fs.existsSync('./data')) fs.mkdirSync('./data');
-const db = new sqlite3.Database('./data/content.db');
+const DB_PATH = process.env.DB_PATH || './data/content.db';
+const db = new sqlite3.Database(DB_PATH);
 
 const SECRET_KEY = 'YOUR_SUPER_SECRET_KEY';
 const INTERNAL_API_KEY = 'YOUR_INTERNAL_SERVICE_KEY';
@@ -16,6 +17,21 @@ db.run('PRAGMA journal_mode=WAL;');
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.raw({ type: 'application/octet-stream', limit: '50mb' }));
+
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && (origin.endsWith('.cns-studios.com') || origin.includes('localhost'))) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
 
 const WS_PORT = process.env.WS_PORT || 3002;
 const HTTP_PORT = process.env.HTTP_PORT || 3003;
@@ -63,7 +79,7 @@ wss.on('connection', (ws, req) => {
             const msg = JSON.parse(data);
             
             if (msg.type === 'auth') {
-                const { userId, peerSecret } = msg;
+                const { userId, peerSecret, freeStorage } = msg;
                 if (!userId || !peerSecret) return;
 
                 db.get('SELECT peer_secret FROM peers WHERE user_id = ?', [userId], (err, row) => {
@@ -73,11 +89,13 @@ wss.on('connection', (ws, req) => {
                     }
 
                     db.run(
-                        `INSERT INTO peers (user_id, peer_secret, online, last_seen, websocket_id) 
-                         VALUES (?, ?, 1, ?, ?)
+                        `INSERT INTO peers (user_id, peer_secret, online, last_seen, websocket_id, free_storage_bytes) 
+                         VALUES (?, ?, 1, ?, ?, ?)
                          ON CONFLICT(user_id) DO UPDATE SET 
-                            online=1, last_seen=excluded.last_seen, websocket_id=excluded.websocket_id, peer_secret=COALESCE(peer_secret, excluded.peer_secret)`,
-                        [userId, peerSecret, Math.floor(Date.now() / 1000), wsId],
+                            online=1, last_seen=excluded.last_seen, websocket_id=excluded.websocket_id, 
+                            free_storage_bytes=excluded.free_storage_bytes,
+                            peer_secret=COALESCE(peer_secret, excluded.peer_secret)`,
+                        [userId, peerSecret, Math.floor(Date.now() / 1000), wsId, freeStorage || 0],
                         function(err) {
                             if (err) {
                                 log('ERROR', ws, `Peer auth error: ${err.message}`);
@@ -239,7 +257,7 @@ app.post('/upload/chunk', (req, res) => {
 });
 
 function distributeChunkToPeers(chunkId, chunkData) {
-    db.all('SELECT id FROM peers WHERE online = 1 ORDER BY RANDOM() LIMIT 5', (err, peers) => {
+    db.all('SELECT id FROM peers WHERE online = 1 ORDER BY free_storage_bytes DESC, RANDOM() LIMIT 5', (err, peers) => {
         if (err || !peers) return;
         peers.forEach(peerRow => {
             const peerConnection = Array.from(activePeers.values()).find(p => p.peerId === peerRow.id);
