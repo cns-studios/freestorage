@@ -1,11 +1,26 @@
 const express = require('express');
 const sqlite3 = require('sqlite3');
 const app = express();
-const PORT = 3004;
+const PORT = process.env.PORT || 3004;
+const DB_PATH = process.env.DB_PATH || './data/userdata.db';
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 
-const db = new sqlite3.Database('./data/userdata.db');
+if (!ADMIN_TOKEN) {
+    console.error("FATAL: ADMIN_TOKEN environment variable is not set. Admin panel is disabled for security.");
+    process.exit(1);
+}
+
+const db = new sqlite3.Database(DB_PATH);
 
 app.use(express.json());
+
+// Middleware to check admin token
+const checkToken = (req, res, next) => {
+    if (req.headers['x-admin-token'] !== ADMIN_TOKEN) {
+        return res.status(403).send('Forbidden');
+    }
+    next();
+};
 
 app.get('/', (req, res) => {
     res.send(`
@@ -31,8 +46,15 @@ app.get('/', (req, res) => {
                 <div id="list">Loading...</div>
             </div>
             <script>
+                const ADMIN_TOKEN = prompt('Enter Admin Token');
                 async function load() {
-                    const res = await fetch('/api/users');
+                    const res = await fetch('/api/users', {
+                        headers: { 'X-Admin-Token': ADMIN_TOKEN }
+                    });
+                    if (res.status === 403) {
+                        alert('Invalid Token');
+                        return;
+                    }
                     const users = await res.json();
                     const list = document.getElementById('list');
                     if (users.length === 0) {
@@ -59,7 +81,10 @@ app.get('/', (req, res) => {
                     if(!confirm(action + ' user ' + id + '?')) return;
                     await fetch('/api/' + action, {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Admin-Token': ADMIN_TOKEN
+                        },
                         body: JSON.stringify({ id })
                     });
                     load();
@@ -71,14 +96,14 @@ app.get('/', (req, res) => {
     `);
 });
 
-app.get('/api/users', (req, res) => {
+app.get('/api/users', checkToken, (req, res) => {
     db.all("SELECT id, username, created_at FROM users WHERE status = 'pending'", (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
 });
 
-app.post('/api/approve', (req, res) => {
+app.post('/api/approve', checkToken, (req, res) => {
     const { id } = req.body;
     db.run("UPDATE users SET status = 'approved' WHERE id = ?", [id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -86,7 +111,7 @@ app.post('/api/approve', (req, res) => {
     });
 });
 
-app.post('/api/reject', (req, res) => {
+app.post('/api/reject', checkToken, (req, res) => {
     const { id } = req.body;
     db.run("DELETE FROM users WHERE id = ?", [id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
