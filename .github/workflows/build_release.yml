@@ -38,6 +38,7 @@ jobs:
             electron-app/dist/*.pacman
             electron-app/dist/*.pkg.tar.*
             electron-app/dist/*.AppImage
+            electron-app/dist/latest-linux.yml
           body: |
             ## FreeStorage Desktop App
             
@@ -102,6 +103,7 @@ jobs:
         with:
           files: |
             electron-app/dist/*.exe
+            electron-app/dist/latest.yml
 
   build-mac:
     runs-on: macos-latest
@@ -125,3 +127,4 @@ jobs:
           files: |
             electron-app/dist/*.dmg
             electron-app/dist/*.zip
+            electron-app/dist/latest-mac.yml
