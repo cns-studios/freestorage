@@ -498,7 +498,7 @@
                 <h1>Upload</h1>
                 
                 <div class="upload-grid">
-                    <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-zone" id="upload-zone-file" onclick="document.getElementById('fileInput').click()">
                         <svg class="icon upload-icon" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
                         <div>
                             <div style="font-weight: 500; color: var(--text-primary); margin-bottom: 0.25rem;">Select File</div>
@@ -507,13 +507,25 @@
                         <input type="file" id="fileInput" style="display:none" onchange="handleFileSelect(this)">
                     </div>
                     
-                    <div class="upload-zone" onclick="document.getElementById('folderInput').click()">
+                    <div class="upload-zone" id="upload-zone-folder" onclick="document.getElementById('folderInput').click()">
                         <svg class="icon upload-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
                         <div>
                             <div style="font-weight: 500; color: var(--text-primary); margin-bottom: 0.25rem;">Select Folder</div>
                             <div style="font-size: 0.75rem;">Recursive upload</div>
                         </div>
                         <input type="file" id="folderInput" webkitdirectory directory style="display:none" onchange="handleFolderSelect(this)">
+                    </div>
+                </div>
+
+                <div id="global-progress" style="display:none; margin-bottom: 2rem; padding: 1.5rem; background: var(--card-color); border: 1px solid var(--border-color); border-radius: 8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem;">
+                        <div style="font-weight:500" id="global-progress-label">Uploading folder...</div>
+                        <button class="secondary danger" style="width:auto; padding: 4px 12px; font-size: 0.75rem;" onclick="cancelUpload()">Cancel Upload</button>
+                    </div>
+                    <div class="progress-bar-bg" style="height: 8px;"><div class="progress-fill" id="global-progress-fill" style="width:0%"></div></div>
+                    <div style="display:flex; justify-content:space-between; margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+                        <span id="global-progress-files">0 / 0 files</span>
+                        <span id="global-progress-pct">0%</span>
                     </div>
                 </div>
 
@@ -548,6 +560,12 @@
         let profileData = {};
         let currentPath = '';
         let allFiles = [];
+        let uploadCancelled = false;
+
+        async function cancelUpload() {
+            uploadCancelled = true;
+            document.getElementById('global-progress-label').innerText = 'Cancelling...';
+        }
 
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -787,21 +805,53 @@
 
         async function handleFileSelect(input) {
             if(!input.files[0]) return;
+            uploadCancelled = false;
             await processUpload(input.files[0]);
         }
 
         async function handleFolderSelect(input) {
             if(!input.files.length) return;
+            uploadCancelled = false;
             const statusDiv = document.getElementById('upload-status');
             statusDiv.innerHTML = '';
             
-            for(let i=0; i<input.files.length; i++) {
+            const globalProgress = document.getElementById('global-progress');
+            const globalFill = document.getElementById('global-progress-fill');
+            const globalFiles = document.getElementById('global-progress-files');
+            const globalPct = document.getElementById('global-progress-pct');
+            const total = input.files.length;
+            
+            globalProgress.style.display = 'block';
+            document.getElementById('upload-zone-file').style.pointerEvents = 'none';
+            document.getElementById('upload-zone-folder').style.pointerEvents = 'none';
+
+            for(let i=0; i<total; i++) {
+                if(uploadCancelled) break;
                 const file = input.files[i];
+                globalFiles.innerText = `${i + 1} / ${total} files`;
+                const progress = Math.round((i / total) * 100);
+                globalFill.style.width = progress + '%';
+                globalPct.innerText = progress + '%';
+                
                 await processUpload(file, file.webkitRelativePath);
             }
+            
+            globalFill.style.width = '100%';
+            globalPct.innerText = '100%';
+            globalProgress.style.display = 'none';
+            document.getElementById('upload-zone-file').style.pointerEvents = 'auto';
+            document.getElementById('upload-zone-folder').style.pointerEvents = 'auto';
+            
+            if(uploadCancelled) {
+                alert('Upload cancelled.');
+            } else {
+                alert('Folder upload complete.');
+            }
+            refreshFiles();
         }
 
         async function processUpload(file, relativePath) {
+            if(uploadCancelled) return;
             const statusDiv = document.getElementById('upload-status');
             const itemDiv = document.createElement('div');
             itemDiv.className = 'progress-item';
@@ -818,19 +868,27 @@
             const fill = itemDiv.querySelector('.progress-fill');
             const status = itemDiv.querySelector('.progress-status');
 
-            window.api.onUploadProgress((data) => {
+            const progressHandler = (event, data) => {
                  const pct = Math.round((data.current / data.total) * 100);
-                 if (fill.style.width !== '100%') {
-                    fill.style.width = pct + '%';
-                    status.innerText = pct + '%';
-                 }
-            });
+                 fill.style.width = pct + '%';
+                 status.innerText = pct + '%';
+            };
             
             try {
-                await window.api.uploadFile({ 
+                const res = await window.api.uploadFile({ 
                     filePath: file.path, 
                     relativePath: relativePath 
                 });
+                
+                if(uploadCancelled) {
+                    if(res && res.fileId) {
+                        await window.api.deleteFile(res.fileId);
+                    }
+                    fill.style.background = 'var(--text-secondary)';
+                    status.innerText = 'CAN';
+                    return;
+                }
+
                 fill.style.width = '100%';
                 fill.style.background = 'var(--success-color)';
                 status.innerText = 'OK';

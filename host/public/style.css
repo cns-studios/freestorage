@@ -68,10 +68,18 @@ button.secondary { background: transparent; border: 1px solid var(--border-color
     margin-left: 5px;
     opacity: 0;
     transition: opacity 0.2s;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 .file-row:hover .action-btn { opacity: 1; }
-.action-btn.danger { border-color: var(--danger-color); color: var(--danger-color); }
-.action-btn.danger:hover { background: var(--danger-color); color: white; }
+.action-btn:hover { border-color: var(--text-secondary); color: var(--text-primary); background: var(--hover-bg); }
+.action-btn.danger { border-color: rgba(239, 68, 68, 0.2); color: var(--danger-color); }
+.action-btn.danger:hover { background: rgba(239, 68, 68, 0.1); border-color: var(--danger-color); }
+
 .secondary.danger { border-color: var(--danger-color); color: var(--danger-color); }
 .secondary.danger:hover { background: var(--danger-color); color: white; }
 

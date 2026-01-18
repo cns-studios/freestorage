@@ -61,7 +61,6 @@
                 <h1>Files</h1>
                 <div style="margin-bottom: 1rem; display: flex; gap: 1rem;">
                     <input type="text" id="file-search" placeholder="Search files..." oninput="renderFiles()" style="flex-grow: 1; margin: 0;">
-                    <button class="secondary danger" style="width: auto; padding: 8px 16px;" onclick="deleteAllFiles()">Delete All Files</button>
                 </div>
                 <table class="file-table">
                     <thead><tr><th>Name</th><th>Size</th><th style="text-align:right">Action</th></tr></thead>
@@ -77,7 +76,8 @@
                     <input type="text" id="new-username" placeholder="New Username">
                     <input type="password" id="new-password" placeholder="New Password">
                     <button onclick="updateAccount()">Update Account</button>
-                    <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                    <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 10px;">
+                        <button class="secondary danger" onclick="deleteAllFiles()">Delete All Files</button>
                         <button class="secondary danger" onclick="deleteAccount()">Delete Entire Account</button>
                     </div>
                 </div>

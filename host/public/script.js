@@ -120,9 +120,9 @@ function renderFiles() {
                 </td>
                 <td>${item.count} items</td>
                 <td style="text-align:right">
-                    <button class="action-btn" onclick="downloadFolder('${item.name}')">Download</button>
-                    <button class="action-btn" onclick="renameFolder('${item.name}')">Rename</button>
-                    <button class="action-btn danger" onclick="deleteFolder('${item.name}')">Delete</button>
+                    <button class="action-btn" title="Download" onclick="downloadFolder('${item.name}')"><svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
+                    <button class="action-btn" title="Rename" onclick="renameFolder('${item.name}')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+                    <button class="action-btn danger" title="Delete" onclick="deleteFolder('${item.name}')"><svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
                 </td>
             `;
         } else {
@@ -133,8 +133,9 @@ function renderFiles() {
                 </td>
                 <td>${(item.file_size_bytes / (1024*1024)).toFixed(2)} MB</td>
                 <td style="text-align:right" class="file-actions">
-                    <button class="action-btn" onclick="renameFile('${item.id}', '${item.filename}')">Rename</button>
-                    <button class="action-btn" onclick="downloadFile('${item.id}')">Download</button>
+                    <button class="action-btn" title="Rename" onclick="renameFile('${item.id}', '${item.filename}')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+                    <button class="action-btn" title="Download" onclick="downloadFile('${item.id}')"><svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
+                    <button class="action-btn danger" title="Delete" onclick="deleteFile('${item.id}')"><svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
                 </td>
             `;
         }
