@@ -1,6 +1,6 @@
-const USERDATA_URL = window.location.protocol + '//api.' + window.location.host;
-const CONTENT_URL = window.location.protocol + '//content.' + window.location.host;
-const WS_URL = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + 'ws.' + window.location.host;
+const USERDATA_URL = 'https://auth-freestorage.cns-studios.com';
+const CONTENT_URL = 'https://tracker-freestorage.cns-studios.com';
+const WS_URL = 'wss://ws-freestorage.cns-studios.com';
 
 let ws = null;
 let currentUser = {};

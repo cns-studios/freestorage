@@ -10,9 +10,9 @@ let userData = {};
 let pingInterval;
 const pendingDownloads = new Map();
 
-const USERDATA_URL = 'https://api.freestorage.cns-studios.com';
-const CONTENT_URL = 'https://content.freestorage.cns-studios.com';
-const WS_URL = 'wss://ws.freestorage.cns-studios.com';
+const USERDATA_URL = 'https://auth-freestorage.cns-studios.com';
+const CONTENT_URL = 'https://tracker-freestorage.cns-studios.com';
+const WS_URL = 'wss://ws-freestorage.cns-studios.com';
 
 const CHUNK_STORAGE_PATH = path.join(app.getPath('userData'), 'chunks');
 if (!fs.existsSync(CHUNK_STORAGE_PATH)) {
