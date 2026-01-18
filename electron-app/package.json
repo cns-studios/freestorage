@@ -20,7 +20,7 @@
   "build": {
     "appId": "com.freestorage.desktop",
     "productName": "freestorage",
-    "artifactName": "freestorage-installer.${ext}",
+    "artifactName": "freestorage-installer-${arch}.${ext}",
     "directories": {
       "output": "dist"
     },
