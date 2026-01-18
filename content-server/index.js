@@ -397,43 +397,10 @@ app.delete('/files/:fileId', authenticateToken, (req, res) => {
     });
 });
 
-app.delete('/files/user/:userId/all', authenticateToken, (req, res) => {
-    const { userId } = req.params;
-    
-    if (parseInt(userId) !== req.userId) {
-        return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    db.get('SELECT SUM(file_size_bytes) as total_size FROM files WHERE user_id = ?', [userId], (err, result) => {
-        const totalSize = result ? result.total_size : 0;
-        
-        db.run('DELETE FROM chunk_replicas WHERE chunk_id IN (SELECT id FROM chunks WHERE file_id IN (SELECT id FROM files WHERE user_id = ?))', [userId]);
-        db.run('DELETE FROM cached_chunks WHERE chunk_id IN (SELECT id FROM chunks WHERE file_id IN (SELECT id FROM files WHERE user_id = ?))', [userId]);
-        db.run('DELETE FROM chunks WHERE file_id IN (SELECT id FROM files WHERE user_id = ?)', [userId]);
-        db.run('DELETE FROM files WHERE user_id = ?', [userId], (err) => {
-            if (err) {
-                log('ERROR', req, `Bulk delete db error: ${err.message}`);
-                return res.status(500).json({ error: 'Db error' });
-            }
-            
-            if (totalSize > 0) {
-                const sizeGb = totalSize / (1024 * 1024 * 1024);
-                fetch(`${USERDATA_SERVER_URL}/update-storage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, addGb: -sizeGb, apiKey: INTERNAL_API_KEY })
-                }).catch(e => log('ERROR', null, `Failed to update storage usage: ${e.message}`));
-            }
-            log('WARN', req, `All files deleted for user ${userId}`);
-            res.json({ success: true });
-        });
-    });
-});
-
 app.get('/download/:fileId', authenticateToken, (req, res) => {
     const { fileId } = req.params;
 
-    db.get('SELECT user_id FROM files WHERE id = ?', [fileId], (err, file) => {
+    db.get('SELECT user_id, filename FROM files WHERE id = ?', [fileId], (err, file) => {
         if (!file || file.user_id !== req.userId) {
             return res.status(403).json({ error: 'Unauthorized' });
         }
@@ -450,9 +417,23 @@ app.get('/download/:fileId', authenticateToken, (req, res) => {
                     return res.status(500).json({ error: 'Db error' });
                 }
                 log('INFO', req, `Download requested for file ${fileId}`);
-                res.json({ chunks: chunks.map(c => ({ chunkId: c.id, chunkIndex: c.chunk_index, chunkHash: c.chunk_hash }))});
+                res.json({ 
+                    filename: file.filename,
+                    chunks: chunks.map(c => ({ chunkId: c.id, chunkIndex: c.chunk_index, chunkHash: c.chunk_hash }))
+                });
             }
         );
+    });
+});
+
+app.post('/files/rename', authenticateToken, (req, res) => {
+    const { fileId, newFilename } = req.body;
+    db.get('SELECT user_id FROM files WHERE id = ?', [fileId], (err, file) => {
+        if (!file || file.user_id !== req.userId) return res.status(403).json({ error: 'Unauthorized' });
+        db.run('UPDATE files SET filename = ? WHERE id = ?', [newFilename, fileId], (err) => {
+            if (err) return res.status(500).json({ error: 'Db error' });
+            res.json({ success: true });
+        });
     });
 });
 
@@ -474,6 +455,33 @@ app.get('/files/user/:userId', authenticateToken, (req, res) => {
             res.json({ files });
         }
     );
+});
+
+app.delete('/files/user/:userId/all', authenticateToken, (req, res) => {
+    const { userId } = req.params;
+    
+    if (parseInt(userId) !== req.userId) {
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    db.run('DELETE FROM chunk_replicas WHERE chunk_id IN (SELECT id FROM chunks WHERE file_id IN (SELECT id FROM files WHERE user_id = ?))', [userId]);
+    db.run('DELETE FROM cached_chunks WHERE chunk_id IN (SELECT id FROM chunks WHERE file_id IN (SELECT id FROM files WHERE user_id = ?))', [userId]);
+    db.run('DELETE FROM chunks WHERE file_id IN (SELECT id FROM files WHERE user_id = ?)', [userId]);
+    db.run('DELETE FROM files WHERE user_id = ?', [userId], (err) => {
+        if (err) {
+            log('ERROR', req, `Bulk delete db error: ${err.message}`);
+            return res.status(500).json({ error: 'Db error' });
+        }
+        
+        fetch(`${USERDATA_SERVER_URL}/reset-storage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, apiKey: INTERNAL_API_KEY })
+        }).catch(e => log('ERROR', null, `Failed to reset storage usage: ${e.message}`));
+        
+        log('WARN', req, `All files deleted for user ${userId}`);
+        res.json({ success: true });
+    });
 });
 
 setInterval(() => {

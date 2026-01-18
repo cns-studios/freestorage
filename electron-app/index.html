@@ -471,8 +471,9 @@
             </div>
 
             <div id="files" class="tab-content">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.5rem;">
-                    <h1>Files</h1>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.5rem; gap: 1rem;">
+                    <h1 style="margin:0">Files</h1>
+                    <input type="text" id="file-search" placeholder="Search files..." oninput="renderFiles()" style="max-width: 300px; margin: 0;">
                     <button class="secondary" style="width:auto" onclick="refreshFiles()">
                         <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                         Refresh
@@ -545,120 +546,143 @@
     <script>
         let currentUser = null;
         let profileData = {};
+        let currentPath = '';
+        let allFiles = [];
 
         function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            
-            const navItems = {
-                'dashboard': 0,
-                'files': 1,
-                'upload': 2,
-                'settings': 3
-            };
-            
-            const idx = navItems[tabId];
-            if (idx !== undefined) {
-                document.querySelectorAll('.nav-item')[idx].classList.add('active');
-            }
-
-            if (tabId === 'files' || tabId === 'dashboard') loadProfile();
-            if (tabId === 'files') refreshFiles();
-        }
-
-        function showLoading(show) {
-            document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
-        }
-
-        async function login() {
-            const u = document.getElementById('username').value;
-            const p = document.getElementById('password').value;
-            if(!u || !p) return;
-            showLoading(true);
-            const res = await window.api.login({ username: u, password: p });
-            showLoading(false);
-            if(res.success) {
-                currentUser = res.data;
-                document.getElementById('auth-screen').style.display = 'none';
-                document.getElementById('app-screen').style.display = 'flex';
-                loadProfile();
-            } else {
-                document.getElementById('auth-msg').innerText = res.error;
-            }
-        }
-
-        async function register() {
-            const u = document.getElementById('username').value;
-            const p = document.getElementById('password').value;
-            if(!u || !p) return;
-            showLoading(true);
-            const res = await window.api.register({ username: u, password: p });
-            showLoading(false);
-            if(res.success) {
-                if (res.pending) {
-                    document.getElementById('auth-msg').innerText = res.message;
-                    document.getElementById('auth-msg').style.color = 'var(--text-primary)';
-                } else {
-                    currentUser = res.data;
-                    document.getElementById('auth-screen').style.display = 'none';
-                    document.getElementById('app-screen').style.display = 'flex';
-                    loadProfile();
-                }
-            } else {
-                document.getElementById('auth-msg').innerText = res.error;
-                document.getElementById('auth-msg').style.color = 'var(--danger-color)';
-            }
-        }
-
-        async function loadProfile() {
-            if(!currentUser) return;
-            const profile = await window.api.getProfile(currentUser.token);
-            if(profile.error) return;
-            profileData = profile;
-            
-            document.getElementById('storage-used').innerText = profile.storage_used_gb.toFixed(2) + ' GB';
-            document.getElementById('storage-limit').innerText = profile.storage_limit_gb + ' GB';
-            
-            const mins = profile.total_online_minutes;
-            const target = 4320;
-            const remaining = target - mins;
-            const hoursLeft = Math.floor(remaining / 60);
-            const minsLeft = remaining % 60;
-            document.getElementById('time-to-next').innerText = `${hoursLeft}h ${minsLeft}m`;
-        }
-
+...
         async function refreshFiles() {
             const res = await window.api.getFiles(currentUser.userId);
+            allFiles = res.files || [];
+            renderFiles();
+        }
+
+        function renderFiles() {
+            const search = document.getElementById('file-search').value.toLowerCase();
             const tbody = document.getElementById('file-list-body');
             tbody.innerHTML = '';
             
-            if(res.files && res.files.length > 0) {
-                res.files.forEach(file => {
+            const items = new Map();
+            
+            allFiles.forEach(file => {
+                if (search && !file.filename.toLowerCase().includes(search)) return;
+                
+                const relative = currentPath ? file.filename.substring(currentPath.length + 1) : file.filename;
+                const parts = relative.split('/');
+                
+                if (parts.length > 1 && !search) {
+                    const folderName = parts[0];
+                    if (!items.has(folderName)) {
+                        items.set(folderName, { type: 'folder', name: folderName, count: 0 });
+                    }
+                    items.get(folderName).count++;
+                } else {
+                    items.set(file.id, { type: 'file', ...file });
+                }
+            });
+
+            if (currentPath && !search) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="4" onclick="goBack()" style="cursor:pointer; color: var(--text-secondary);">📁 .. (Go Back)</td>`;
+                tbody.appendChild(tr);
+            }
+
+            if (items.size > 0) {
+                items.forEach((item, key) => {
                     const tr = document.createElement('tr');
-                    const sizeMb = (file.file_size_bytes / (1024 * 1024)).toFixed(2);
-                    const statusClass = file.upload_status === 'complete' ? 'status-complete' : 'status-pending';
-                    
-                    tr.innerHTML = `
-                        <td style="font-family: monospace; color: var(--text-primary);">${file.filename}</td>
-                        <td style="color: var(--text-secondary);">${sizeMb} MB</td>
-                        <td><span class="status-badge ${statusClass}">${file.upload_status}</span></td>
-                        <td>
-                            <div class="action-btn-group" style="justify-content: flex-end;">
-                                <button class="action-btn" title="Download" onclick="downloadFile('${file.id}')">
-                                    <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                                </button>
-                                <button class="action-btn delete" title="Delete" onclick="deleteFile('${file.id}')">
-                                    <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                </button>
-                            </div>
-                        </td>
-                    `;
+                    if (item.type === 'folder') {
+                        tr.innerHTML = `
+                            <td onclick="enterFolder('${item.name}')" style="cursor:pointer; font-weight:500;">📁 ${item.name}</td>
+                            <td>${item.count} items</td>
+                            <td>-</td>
+                            <td style="text-align:right">
+                                <div class="action-btn-group" style="justify-content: flex-end;">
+                                    <button class="action-btn" title="Rename" onclick="renameFolder('${item.name}')">
+                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                    </button>
+                                    <button class="action-btn delete" title="Delete" onclick="deleteFolder('${item.name}')">
+                                        <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    </button>
+                                </div>
+                            </td>
+                        `;
+                    } else {
+                        const sizeMb = (item.file_size_bytes / (1024 * 1024)).toFixed(2);
+                        const statusClass = item.upload_status === 'complete' ? 'status-complete' : 'status-pending';
+                        const displayName = search ? item.filename : item.filename.split('/').pop();
+                        
+                        tr.innerHTML = `
+                            <td style="font-family: monospace; color: var(--text-primary);">📄 ${displayName}</td>
+                            <td style="color: var(--text-secondary);">${sizeMb} MB</td>
+                            <td><span class="status-badge ${statusClass}">${item.upload_status}</span></td>
+                            <td>
+                                <div class="action-btn-group" style="justify-content: flex-end;">
+                                    <button class="action-btn" title="Rename" onclick="renameFile('${item.id}', '${item.filename}')">
+                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                    </button>
+                                    <button class="action-btn" title="Download" onclick="downloadFile('${item.id}')">
+                                        <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    </button>
+                                    <button class="action-btn delete" title="Delete" onclick="deleteFile('${item.id}')">
+                                        <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    </button>
+                                </div>
+                            </td>
+                        `;
+                    }
                     tbody.appendChild(tr);
                 });
             } else {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:3rem; color: var(--text-tertiary);">No files found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:3rem; color: var(--text-tertiary);">No items found</td></tr>';
             }
+        }
+
+        function enterFolder(name) {
+            currentPath = currentPath ? `${currentPath}/${name}` : name;
+            renderFiles();
+        }
+
+        function goBack() {
+            const parts = currentPath.split('/');
+            parts.pop();
+            currentPath = parts.join('/');
+            renderFiles();
+        }
+
+        async function renameFile(fileId, oldName) {
+            const newName = prompt('New filename:', oldName);
+            if (!newName || newName === oldName) return;
+            const res = await window.api.renameFile(fileId, newName);
+            if (res.success) refreshFiles();
+        }
+
+        async function renameFolder(oldName) {
+            const newFolderName = prompt('New folder name:', oldName);
+            if (!newFolderName || newFolderName === oldName) return;
+            
+            const prefix = currentPath ? `${currentPath}/${oldName}/` : `${oldName}/`;
+            const newPrefix = currentPath ? `${currentPath}/${newFolderName}/` : `${newFolderName}/`;
+            
+            showLoading(true);
+            const affected = allFiles.filter(f => f.filename.startsWith(prefix));
+            for (const file of affected) {
+                const newName = file.filename.replace(prefix, newPrefix);
+                await window.api.renameFile(file.id, newName);
+            }
+            showLoading(false);
+            refreshFiles();
+        }
+
+        async function deleteFolder(folderName) {
+            if (!confirm('Delete folder and all its content?')) return;
+            const prefix = currentPath ? `${currentPath}/${folderName}/` : `${folderName}/`;
+            const affected = allFiles.filter(f => f.filename.startsWith(prefix));
+            showLoading(true);
+            for (const file of affected) {
+                await window.api.deleteFile(file.id);
+            }
+            showLoading(false);
+            refreshFiles();
         }
 
         async function handleFileSelect(input) {

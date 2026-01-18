@@ -254,6 +254,16 @@ app.delete('/user', authenticateToken, (req, res) => {
     });
 });
 
+app.post('/reset-storage', (req, res) => {
+    const { userId, apiKey } = req.body;
+    if (apiKey !== INTERNAL_API_KEY) return res.status(403).json({ error: 'Unauthorized' });
+    
+    db.run('UPDATE users SET storage_used_gb = 0 WHERE id = ?', [userId], (err) => {
+        if (err) return res.status(500).json({ error: 'Db error' });
+        res.json({ success: true });
+    });
+});
+
 app.post('/update-storage', (req, res) => {
     const { userId, addGb, apiKey } = req.body;
     if (apiKey !== INTERNAL_API_KEY) {

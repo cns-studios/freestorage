@@ -32,6 +32,7 @@
             <div class="logo">FreeStorage</div>
             <div class="nav-item active" onclick="switchTab('dashboard')">Overview</div>
             <div class="nav-item" onclick="switchTab('files')">Files</div>
+            <div class="nav-item" onclick="switchTab('settings')">Settings</div>
             <div style="flex-grow: 1;"></div>
             <div class="nav-item" onclick="logout()" style="color: var(--danger-color);">Log Out</div>
         </div>
@@ -58,10 +59,27 @@
 
             <div id="files" class="tab-content" style="display:none">
                 <h1>Files</h1>
+                <div style="margin-bottom: 1rem; display: flex; gap: 1rem;">
+                    <input type="text" id="file-search" placeholder="Search files..." oninput="renderFiles()" style="flex-grow: 1; margin: 0;">
+                    <button class="secondary danger" style="width: auto; padding: 8px 16px;" onclick="deleteAllFiles()">Delete All Files</button>
+                </div>
                 <table class="file-table">
                     <thead><tr><th>Name</th><th>Size</th><th style="text-align:right">Action</th></tr></thead>
                     <tbody id="file-list-body"></tbody>
                 </table>
+            </div>
+            <div id="settings" class="tab-content" style="display:none">
+                <h1>Settings</h1>
+                <div class="auth-card" style="max-width: 100%; margin: 0; box-shadow: none; border: 1px solid var(--border-color);">
+                    <h3>Account Security</h3>
+                    <p class="subtitle">Update your credentials. Leave blank to keep current.</p>
+                    <input type="text" id="new-username" placeholder="New Username">
+                    <input type="password" id="new-password" placeholder="New Password">
+                    <button onclick="updateAccount()">Update Account</button>
+                    <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                        <button class="secondary danger" onclick="deleteAccount()">Delete Entire Account</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

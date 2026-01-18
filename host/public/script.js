@@ -41,22 +41,142 @@ function switchTab(tabId) {
     if (tabId === 'files') refreshFiles();
 }
 
+let currentPath = '';
+let allFiles = [];
+
+async function decryptData(encryptedData, keyHex) {
+    const key = await crypto.subtle.importKey(
+        'raw', 
+        new Uint8Array(keyHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16))), 
+        'AES-CBC', 
+        false, 
+        ['decrypt']
+    );
+    const iv = encryptedData.slice(0, 16);
+    const data = encryptedData.slice(16);
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-CBC', iv }, key, data);
+    return decrypted;
+}
+
 async function refreshFiles() {
     const res = await fetch(`${CONTENT_URL}/files/user/${currentUser.userId}`, {
         headers: { 'Authorization': `Bearer ${currentUser.token}` }
     });
     const data = await res.json();
+    allFiles = data.files || [];
+    renderFiles();
+}
+
+function renderFiles() {
+    const search = document.getElementById('file-search').value.toLowerCase();
     const tbody = document.getElementById('file-list-body');
     tbody.innerHTML = '';
-    data.files.forEach(file => {
+    
+    const items = new Map();
+    
+    allFiles.forEach(file => {
+        if (search && !file.filename.toLowerCase().includes(search)) return;
+        
+        const relative = currentPath ? file.filename.substring(currentPath.length + 1) : file.filename;
+        const parts = relative.split('/');
+        
+        if (parts.length > 1) {
+            const folderName = parts[0];
+            if (!items.has(folderName)) {
+                items.set(folderName, { type: 'folder', name: folderName, count: 0 });
+            }
+            items.get(folderName).count++;
+        } else {
+            items.set(file.id, { type: 'file', ...file });
+        }
+    });
+
+    if (currentPath) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${file.filename}</td>
-            <td>${(file.file_size_bytes / (1024*1024)).toFixed(2)} MB</td>
-            <td style="text-align:right"><button style="width:auto; padding: 4px 12px;" onclick="downloadFile('${file.id}')">Download</button></td>
-        `;
+        tr.className = 'file-row';
+        tr.innerHTML = `<td colspan="3" onclick="goBack()" style="cursor:pointer">📁 .. (Go Back)</td>`;
+        tbody.appendChild(tr);
+    }
+
+    items.forEach((item, key) => {
+        const tr = document.createElement('tr');
+        tr.className = 'file-row';
+        if (item.type === 'folder') {
+            tr.innerHTML = `
+                <td onclick="enterFolder('${item.name}')" style="cursor:pointer">📁 ${item.name}</td>
+                <td>${item.count} items</td>
+                <td style="text-align:right">
+                    <button class="action-btn" onclick="renameFolder('${item.name}')">Rename</button>
+                    <button class="action-btn danger" onclick="deleteFolder('${item.name}')">Delete</button>
+                </td>
+            `;
+        } else {
+            tr.innerHTML = `
+                <td>📄 ${item.filename.split('/').pop()}</td>
+                <td>${(item.file_size_bytes / (1024*1024)).toFixed(2)} MB</td>
+                <td style="text-align:right" class="file-actions">
+                    <button class="action-btn" onclick="renameFile('${item.id}', '${item.filename}')">Rename</button>
+                    <button class="action-btn" onclick="downloadFile('${item.id}')">Download</button>
+                </td>
+            `;
+        }
         tbody.appendChild(tr);
     });
+}
+
+function enterFolder(name) {
+    currentPath = currentPath ? `${currentPath}/${name}` : name;
+    renderFiles();
+}
+
+function goBack() {
+    const parts = currentPath.split('/');
+    parts.pop();
+    currentPath = parts.join('/');
+    renderFiles();
+}
+
+async function renameFile(fileId, oldName) {
+    const newName = prompt('New filename:', oldName);
+    if (!newName || newName === oldName) return;
+    await fetch(`${CONTENT_URL}/files/rename`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentUser.token}` },
+        body: JSON.stringify({ fileId, newFilename: newName })
+    });
+    refreshFiles();
+}
+
+async function renameFolder(oldName) {
+    const newFolderName = prompt('New folder name:', oldName);
+    if (!newFolderName || newFolderName === oldName) return;
+    
+    const prefix = currentPath ? `${currentPath}/${oldName}/` : `${oldName}/`;
+    const newPrefix = currentPath ? `${currentPath}/${newFolderName}/` : `${newFolderName}/`;
+    
+    const affected = allFiles.filter(f => f.filename.startsWith(prefix));
+    for (const file of affected) {
+        const newName = file.filename.replace(prefix, newPrefix);
+        await fetch(`${CONTENT_URL}/files/rename`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentUser.token}` },
+            body: JSON.stringify({ fileId: file.id, newFilename: newName })
+        });
+    }
+    refreshFiles();
+}
+
+async function deleteFolder(folderName) {
+    if (!confirm('Delete folder and all its content?')) return;
+    const prefix = currentPath ? `${currentPath}/${folderName}/` : `${folderName}/`;
+    const affected = allFiles.filter(f => f.filename.startsWith(prefix));
+    for (const file of affected) {
+        await fetch(`${CONTENT_URL}/files/${file.id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${currentUser.token}` }
+        });
+    }
+    refreshFiles();
 }
 
 async function downloadFile(fileId) {
@@ -65,15 +185,13 @@ async function downloadFile(fileId) {
         const res = await fetch(`${CONTENT_URL}/download/${fileId}`, {
             headers: { 'Authorization': `Bearer ${currentUser.token}` }
         });
-        const { chunks } = await res.json();
+        const { chunks, filename } = await res.json();
         const chunkBuffers = [];
 
         for (const chunk of chunks) {
             const data = await requestChunk(chunk.chunkId);
-            
             const hash = await crypto.subtle.digest('SHA-256', data);
             const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
-            
             if (hashHex !== chunk.chunkHash) throw new Error('Integrity check failed');
             chunkBuffers.push(data);
         }
@@ -85,11 +203,12 @@ async function downloadFile(fileId) {
             offset += buf.byteLength;
         });
 
-        const blob = new Blob([fullEncrypted], { type: 'application/octet-stream' });
+        const decrypted = await decryptData(fullEncrypted, currentUser.encryptionKey);
+        const blob = new Blob([decrypted], { type: 'application/octet-stream' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `file_${fileId}.bin`;
+        a.download = filename || `file_${fileId}`;
         a.click();
     } catch (e) {
         alert('Download failed: ' + e.message);
@@ -129,6 +248,40 @@ function initWS() {
             }
         }
     };
+}
+
+async function updateAccount() {
+    const username = document.getElementById('new-username').value;
+    const password = document.getElementById('new-password').value;
+    const res = await fetch(`${USERDATA_URL}/user`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentUser.token}` },
+        body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (data.success) alert('Account updated');
+}
+
+async function deleteAccount() {
+    if (!confirm('Are you absolutely sure? This will delete your account and all files forever.')) return;
+    await fetch(`${CONTENT_URL}/files/user/${currentUser.userId}/all`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${currentUser.token}` }
+    });
+    await fetch(`${USERDATA_URL}/user`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${currentUser.token}` }
+    });
+    logout();
+}
+
+async function deleteAllFiles() {
+    if (!confirm('Delete all your files?')) return;
+    await fetch(`${CONTENT_URL}/files/user/${currentUser.userId}/all`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${currentUser.token}` }
+    });
+    refreshFiles();
 }
 
 window.onload = () => {

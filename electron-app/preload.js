@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('api', {
     register: (credentials) => ipcRenderer.invoke('register', credentials),
     uploadFile: (filePath) => ipcRenderer.invoke('upload-file', filePath),
     downloadFile: (fileId) => ipcRenderer.invoke('download-file', fileId),
+    renameFile: (fileId, newFilename) => ipcRenderer.invoke('rename-file', { fileId, newFilename }),
     deleteFile: (fileId) => ipcRenderer.invoke('delete-file', fileId),
     getFiles: (userId) => ipcRenderer.invoke('get-files', userId),
     getProfile: (token) => ipcRenderer.invoke('get-profile', token),

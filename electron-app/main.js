@@ -295,6 +295,20 @@ ipcMain.handle('delete-all-files', async (event, userId) => {
     }
 });
 
+ipcMain.handle('rename-file', async (event, { fileId, newFilename }) => {
+    try {
+        const res = await fetch(`${CONTENT_URL}/files/rename`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${userData.token}`
+            },
+            body: JSON.stringify({ fileId, newFilename })
+        });
+        return await res.json();
+    } catch (e) { return { error: e.message }; }
+});
+
 ipcMain.handle('download-file', async (event, fileId) => {
     if (!userData.encryptionKey) return { error: 'Not logged in' };
     log('INFO', 'DOWNLOAD', `Starting download: ${fileId}`);
@@ -303,7 +317,7 @@ ipcMain.handle('download-file', async (event, fileId) => {
         const response = await fetch(`${CONTENT_URL}/download/${fileId}`, {
             headers: { 'Authorization': `Bearer ${userData.token}` }
         });
-        const { chunks } = await response.json();
+        const { chunks, filename } = await response.json();
         if (!chunks || chunks.length === 0) throw new Error('File not found or no chunks');
 
         const chunkBuffers = [];
@@ -336,7 +350,7 @@ ipcMain.handle('download-file', async (event, fileId) => {
         const decrypted = decryptData(fullEncrypted, userData.encryptionKey);
         
         const downloadsPath = app.getPath('downloads');
-        const savePath = path.join(downloadsPath, `downloaded_${fileId}.bin`); 
+        const savePath = path.join(downloadsPath, filename || `downloaded_${fileId}`); 
         fs.writeFileSync(savePath, decrypted);
         
         log('INFO', 'DOWNLOAD', `Download complete: ${savePath}`);
