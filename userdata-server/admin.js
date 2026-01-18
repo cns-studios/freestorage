@@ -14,7 +14,6 @@ const db = new sqlite3.Database(DB_PATH);
 
 app.use(express.json());
 
-// Middleware to check admin token
 const checkToken = (req, res, next) => {
     if (req.headers['x-admin-token'] !== ADMIN_TOKEN) {
         return res.status(403).send('Forbidden');

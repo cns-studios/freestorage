@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const WebSocket = require('ws');
@@ -68,7 +69,18 @@ function createWindow() {
     });
     
     mainWindow.loadFile('index.html');
+
+    autoUpdater.checkForUpdatesAndNotify();
 }
+
+autoUpdater.on('update-available', () => {
+    log('INFO', 'UPDATE', 'Update available');
+});
+
+autoUpdater.on('update-downloaded', () => {
+    log('INFO', 'UPDATE', 'Update downloaded; will install now');
+    autoUpdater.quitAndInstall();
+});
 
 app.whenReady().then(createWindow);
 

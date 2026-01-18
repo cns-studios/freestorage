@@ -6,10 +6,10 @@
     "name": "FreeStorage Maintainers",
     "email": "maintainers@freestorage.local"
   },
-  "homepage": "https://github.com/aaron/freestorage",
+  "homepage": "https://github.com/cns-studios/freestorage",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aaron/freestorage.git"
+    "url": "https://github.com/cns-studios/freestorage.git"
   },
   "main": "main.js",
   "scripts": {
@@ -19,6 +19,13 @@
   },
   "build": {
     "appId": "com.freestorage.desktop",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "cns-studios",
+        "repo": "freestorage"
+      }
+    ],
     "productName": "freestorage",
     "artifactName": "freestorage-installer-${arch}.${ext}",
     "directories": {
@@ -94,6 +101,7 @@
     }
   },
   "dependencies": {
+    "electron-updater": "^6.7.3",
     "ws": "^8.16.0"
   },
   "devDependencies": {
