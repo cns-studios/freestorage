@@ -3,17 +3,21 @@ services:
     build:
       context: ./userdata-server
     container_name: freestorage-userdata-server
+    restart: unless-stopped
     ports:
       - "8086:8086"
     volumes:
       - ./userdata-server/data:/app/data
     environment:
       - PORT=8086
+      - SECRET_KEY=${SECRET_KEY:-YOUR_SUPER_SECRET_KEY}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-YOUR_INTERNAL_SERVICE_KEY}
 
   content-server:
     build:
       context: ./content-server
     container_name: freestorage-content-server
+    restart: unless-stopped
     ports:
       - "8085:8085"
       - "3002:3002"
@@ -23,6 +27,8 @@ services:
       - HTTP_PORT=8085
       - WS_PORT=3002
       - USERDATA_SERVER_URL=http://userdata-server:8086
+      - SECRET_KEY=${SECRET_KEY:-YOUR_SUPER_SECRET_KEY}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-YOUR_INTERNAL_SERVICE_KEY}
     depends_on:
       - userdata-server
 
@@ -30,6 +36,7 @@ services:
     build:
       context: ./host
     container_name: freestorage-host-server
+    restart: unless-stopped
     ports:
       - "8087:8087"
     environment:
@@ -37,3 +44,80 @@ services:
       - USERDATA_SERVER_URL=http://userdata-server:8086
     depends_on:
       - userdata-server
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: freestorage-tunnel
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    depends_on:
+      - userdata-server
+      - content-server
+      - host
+
+  bot1:
+    build:
+      context: ./bot
+    container_name: bot1
+    restart: unless-stopped
+    volumes:
+      - ./bot/instances/bot1:/bot-data
+    environment:
+      - WS_URL=ws://content-server:3002
+      - DATA_DIR=/bot-data
+    depends_on:
+      - content-server
+
+  bot2:
+    build:
+      context: ./bot
+    container_name: bot2
+    restart: unless-stopped
+    volumes:
+      - ./bot/instances/bot2:/bot-data
+    environment:
+      - WS_URL=ws://content-server:3002
+      - DATA_DIR=/bot-data
+    depends_on:
+      - content-server
+
+  bot3:
+    build:
+      context: ./bot
+    container_name: bot3
+    restart: unless-stopped
+    volumes:
+      - ./bot/instances/bot3:/bot-data
+    environment:
+      - WS_URL=ws://content-server:3002
+      - DATA_DIR=/bot-data
+    depends_on:
+      - content-server
+
+  bot4:
+    build:
+      context: ./bot
+    container_name: bot4
+    restart: unless-stopped
+    volumes:
+      - ./bot/instances/bot4:/bot-data
+    environment:
+      - WS_URL=ws://content-server:3002
+      - DATA_DIR=/bot-data
+    depends_on:
+      - content-server
+
+  bot5:
+    build:
+      context: ./bot
+    container_name: bot5
+    restart: unless-stopped
+    volumes:
+      - ./bot/instances/bot5:/bot-data
+    environment:
+      - WS_URL=ws://content-server:3002
+      - DATA_DIR=/bot-data
+    depends_on:
+      - content-server

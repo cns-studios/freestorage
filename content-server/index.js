@@ -10,8 +10,8 @@ if (!fs.existsSync('./data')) fs.mkdirSync('./data');
 const DB_PATH = process.env.DB_PATH || './data/content.db';
 const db = new sqlite3.Database(DB_PATH);
 
-const SECRET_KEY = 'YOUR_SUPER_SECRET_KEY';
-const INTERNAL_API_KEY = 'YOUR_INTERNAL_SERVICE_KEY';
+const SECRET_KEY = process.env.SECRET_KEY || 'YOUR_SUPER_SECRET_KEY';
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'YOUR_INTERNAL_SERVICE_KEY';
 
 db.run('PRAGMA journal_mode=WAL;');
 

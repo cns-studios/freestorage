@@ -22,19 +22,74 @@ The system consists of several distinct components:
 
 ### Option 1: Docker Compose (Recommended for Servers)
 
-This will start the Userdata Server, Content Server, and Host Server in a coordinated environment.
+This method starts the entire infrastructure: Userdata Server, Content Server, Host Server, a Cloudflare Tunnel for external access, and a simulated network of 5 storage bots.
 
-1.  Navigate to the project root.
-2.  Run the following command:
+#### 1. Configuration (.env)
+Create a `.env` file in the project root to configure secrets and the tunnel token.
 
-    ```bash
-    docker-compose up --build
+```bash
+# .env file example
+
+# Security Keys (Change these for production!)
+SECRET_KEY=your_super_secret_jwt_key
+INTERNAL_API_KEY=your_internal_service_key
+
+# Cloudflare Tunnel Token (Required for public access)
+# Get this from the Cloudflare Zero Trust dashboard when creating a tunnel.
+TUNNEL_TOKEN=eyJhIjoi...
+
+# Optional: Link to the latest client release
+APP_DOWNLOAD_LINK=https://github.com/cns-studios/freestorage/releases/latest
+```
+
+#### 2. Cloudflare Tunnel Setup
+The stack includes a `cloudflared` service to securely expose your local services to the internet without opening ports on your router.
+1.  Go to the [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/).
+2.  Create a new Tunnel.
+3.  Copy the connector token and paste it into your `.env` file as `TUNNEL_TOKEN`.
+4.  Configure the public hostnames in Cloudflare to point to your services:
+    *   `auth.yourdomain.com` -> `http://freestorage-userdata-server:8086`
+    *   `tracker.yourdomain.com` -> `http://freestorage-content-server:8085`
+    *   `ws.yourdomain.com` -> `http://freestorage-content-server:3002` (Enable WebSocket support)
+    *   `www.yourdomain.com` -> `http://freestorage-host-server:8087`
+
+#### 3. Running the Stack
+Start all services in the background:
+
+```bash
+docker-compose up -d --build
+```
+
+To view logs for a specific service (e.g., the content server or a bot):
+```bash
+docker-compose logs -f content-server
+docker-compose logs -f bot1
+```
+
+#### 4. Customization
+
+**Scaling Bots:**
+The default setup runs 5 bot instances (`bot1` through `bot5`). To add more:
+1.  Open `docker-compose.yml`.
+2.  Copy the `bot5` service block and rename it to `bot6`.
+3.  Update the volumes to use a new directory:
+    ```yaml
+    volumes:
+      - ./bot/instances/bot6:/bot-data
     ```
+4.  Run `docker-compose up -d` to start the new container.
 
-3.  The services will be available at:
-    -   **Host (Web):** http://localhost:8087
-    -   **Content Server:** http://localhost:8085 (HTTP), ws://localhost:3002 (WebSocket)
-    -   **Userdata Server:** http://localhost:8086
+**Persistence:**
+All data is persisted locally on the host machine:
+*   **User Database:** `./userdata-server/data/userdata.db`
+*   **Content Database:** `./content-server/data/content.db`
+*   **Bot Storage:** `./bot/instances/botX/storage`
+*   **Bot Credentials:** `./bot/instances/botX/credentials.json`
+
+**Routing:**
+*   The **Content Server** acts as the central coordinator.
+*   **Bots** automatically connect to the Content Server via the internal Docker network (`ws://content-server:3002`).
+*   **Cloudflare Tunnel** handles ingress traffic, routing external requests to the appropriate internal container.
 
 ### Option 2: Manual Setup
 

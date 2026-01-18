@@ -29,8 +29,8 @@ app.use((req, res, next) => {
     next();
 });
 
-const SECRET_KEY = 'YOUR_SUPER_SECRET_KEY';
-const INTERNAL_API_KEY = 'YOUR_INTERNAL_SERVICE_KEY';
+const SECRET_KEY = process.env.SECRET_KEY || 'YOUR_SUPER_SECRET_KEY';
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'YOUR_INTERNAL_SERVICE_KEY';
 
 function getIp(req) {
     return req.ip || req.connection.remoteAddress || 'unknown';
