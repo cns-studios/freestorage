@@ -33,6 +33,7 @@ Create a `.env` file in the project root to configure secrets and the tunnel tok
 # Security Keys (Change these for production!)
 SECRET_KEY=your_super_secret_jwt_key
 INTERNAL_API_KEY=your_internal_service_key
+ADMIN_TOKEN=your_secure_admin_password
 
 # Cloudflare Tunnel Token (Required for public access)
 # Get this from the Cloudflare Zero Trust dashboard when creating a tunnel.
@@ -51,9 +52,15 @@ The stack includes a `cloudflared` service to securely expose your local service
     *   `auth.yourdomain.com` -> `http://freestorage-userdata-server:8086`
     *   `tracker.yourdomain.com` -> `http://freestorage-content-server:8085`
     *   `ws.yourdomain.com` -> `http://freestorage-content-server:3002` (Enable WebSocket support)
+    *   `admin-freestorage.yourdomain.com` -> `http://freestorage-admin:3004`
     *   `www.yourdomain.com` -> `http://freestorage-host-server:8087`
 
-#### 3. Running the Stack
+#### 3. Admin Panel Security
+The admin panel is now integrated into the Docker stack and secured with two layers:
+1.  **Token Auth:** You must set an `ADMIN_TOKEN` in your `.env` file. The web interface will prompt for this token before allowing any actions.
+2.  **Access Control:** It is highly recommended to use **Cloudflare Access** (Zero Trust -> Access -> Applications) to restrict the `admin-freestorage` subdomain to only your specific email address or IP.
+
+#### 4. Running the Stack
 Start all services in the background:
 
 ```bash
