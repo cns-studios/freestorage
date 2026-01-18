@@ -20,13 +20,14 @@ app.use(express.raw({ type: 'application/octet-stream', limit: '50mb' }));
 
 app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin && (origin.endsWith('.cns-studios.com') || origin.includes('localhost'))) {
+    if (origin && (origin.endsWith('cns-studios.com') || origin.includes('localhost'))) {
         res.setHeader('Access-Control-Allow-Origin', origin);
     } else {
         res.setHeader('Access-Control-Allow-Origin', '*');
     }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     if (req.method === 'OPTIONS') {
         return res.sendStatus(200);
     }
