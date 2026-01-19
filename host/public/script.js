@@ -184,9 +184,11 @@ function renderFiles() {
     if (currentPath) {
         const tr = document.createElement('tr');
         tr.className = 'file-row';
-        tr.innerHTML = `<td colspan="3" onclick="goBack()" style="cursor:pointer; display: flex; align-items: center; gap: 8px;">
-            <svg class="icon" style="width:16px; height:16px; stroke: currentColor; fill:none; stroke-width:1.5" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="9" y1="14" x2="15" y2="14"></line></svg>
-            .. (Go Back)
+        tr.innerHTML = `<td colspan="3" onclick="goBack()" style="cursor:pointer;">
+            <div class="cell-content">
+                <svg class="icon" style="width:16px; height:16px; stroke: currentColor; fill:none; stroke-width:1.5" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+                .. (Go Back)
+            </div>
         </td>`;
         tbody.appendChild(tr);
     }
@@ -196,9 +198,11 @@ function renderFiles() {
         tr.className = 'file-row';
         if (item.type === 'folder') {
             tr.innerHTML = `
-                <td onclick="enterFolder('${item.name}')" style="cursor:pointer; display: flex; align-items: center; gap: 8px;">
-                    <svg class="icon" style="width:16px; height:16px; stroke: #888; fill:none; stroke-width:1.5" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                    ${item.name}
+                <td onclick="enterFolder('${item.name}')" style="cursor:pointer;">
+                    <div class="cell-content">
+                        <svg class="icon" style="width:16px; height:16px; stroke: #888; fill:none; stroke-width:1.5" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                        ${item.name}
+                    </div>
                 </td>
                 <td>${item.count} items</td>
                 <td style="text-align:right">
@@ -209,9 +213,11 @@ function renderFiles() {
             `;
         } else {
             tr.innerHTML = `
-                <td style="display: flex; align-items: center; gap: 8px;">
-                    <svg class="icon" style="width:16px; height:16px; stroke: #444; fill:none; stroke-width:1.5" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                    ${item.filename.split('/').pop()}
+                <td>
+                    <div class="cell-content">
+                        <svg class="icon" style="width:16px; height:16px; stroke: #444; fill:none; stroke-width:1.5" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                        ${item.filename.split('/').pop()}
+                    </div>
                 </td>
                 <td>${(item.file_size_bytes / (1024*1024)).toFixed(2)} MB</td>
                 <td style="text-align:right" class="file-actions">

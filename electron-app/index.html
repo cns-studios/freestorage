@@ -398,6 +398,7 @@
         .modal-message { margin: 0; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; }
         .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 0.5rem; }
         .modal-btn { width: auto; padding: 6px 16px; }
+        .cell-content { display: flex; align-items: center; gap: 8px; }
     </style>
 </head>
 <body>
@@ -797,9 +798,11 @@
 
             if (currentPath && !search) {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td colspan="4" onclick="goBack()" style="cursor:pointer; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
-                    <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="9" y1="14" x2="15" y2="14"></line></svg>
-                    .. (Go Back)
+                tr.innerHTML = `<td colspan="4" onclick="goBack()" style="cursor:pointer; color: var(--text-secondary);">
+                    <div class="cell-content">
+                        <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+                        .. (Go Back)
+                    </div>
                 </td>`;
                 tbody.appendChild(tr);
             }
@@ -809,9 +812,11 @@
                     const tr = document.createElement('tr');
                     if (item.type === 'folder') {
                         tr.innerHTML = `
-                            <td onclick="enterFolder('${item.name}')" style="cursor:pointer; font-weight:500; display: flex; align-items: center; gap: 8px;">
-                                <svg class="icon" style="color: var(--text-secondary);" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                                ${item.name}
+                            <td onclick="enterFolder('${item.name}')" style="cursor:pointer; font-weight:500;">
+                                <div class="cell-content">
+                                    <svg class="icon" style="color: var(--text-secondary);" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                    ${item.name}
+                                </div>
                             </td>
                             <td>${item.count} items</td>
                             <td>-</td>
@@ -835,9 +840,11 @@
                         const displayName = search ? item.filename : item.filename.split('/').pop();
                         
                         tr.innerHTML = `
-                            <td style="font-family: monospace; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-                                <svg class="icon" style="color: var(--text-tertiary);" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                                ${displayName}
+                            <td style="font-family: monospace; color: var(--text-primary);">
+                                <div class="cell-content">
+                                    <svg class="icon" style="color: var(--text-tertiary);" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                                    ${displayName}
+                                </div>
                             </td>
                             <td style="color: var(--text-secondary);">${sizeMb} MB</td>
                             <td><span class="status-badge ${statusClass}">${item.upload_status}</span></td>

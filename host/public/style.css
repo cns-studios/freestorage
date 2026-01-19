@@ -115,4 +115,5 @@ button.secondary { background: transparent; border: 1px solid var(--border-color
 .modal-message { margin: 0; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 0.5rem; }
 .modal-btn { width: auto; padding: 6px 16px; }
+.cell-content { display: flex; align-items: center; gap: 8px; }
 
