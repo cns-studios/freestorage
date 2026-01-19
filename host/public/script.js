@@ -6,6 +6,82 @@ let ws = null;
 let currentUser = {};
 const pendingDownloads = new Map();
 
+// Custom Modal Logic
+const modalOverlay = document.getElementById('custom-modal-overlay');
+const modalTitle = document.getElementById('modal-title');
+const modalMessage = document.getElementById('modal-message');
+const modalInput = document.getElementById('modal-input');
+const modalCancel = document.getElementById('modal-cancel');
+const modalConfirm = document.getElementById('modal-confirm');
+
+let modalResolve = null;
+
+function showModal({ title, message, type = 'alert', placeholder = '', confirmText = 'OK', cancelText = 'Cancel', danger = false }) {
+    return new Promise((resolve) => {
+        modalResolve = resolve;
+        modalTitle.innerText = title;
+        modalMessage.innerText = message;
+        modalInput.value = '';
+        
+        modalInput.style.display = type === 'prompt' ? 'block' : 'none';
+        if (type === 'prompt' && placeholder) modalInput.placeholder = placeholder;
+        
+        modalCancel.style.display = type === 'alert' ? 'none' : 'block';
+        modalCancel.innerText = cancelText;
+        
+        modalConfirm.innerText = confirmText;
+        if (danger) {
+            modalConfirm.classList.add('danger');
+            modalConfirm.style.background = 'rgba(239, 68, 68, 0.1)';
+            modalConfirm.style.color = 'var(--danger-color)';
+            modalConfirm.style.borderColor = 'var(--danger-color)';
+        } else {
+            modalConfirm.classList.remove('danger');
+            modalConfirm.style.background = 'var(--accent-color)';
+            modalConfirm.style.color = '#000';
+            modalConfirm.style.borderColor = 'var(--accent-color)';
+        }
+
+        modalOverlay.style.display = 'flex';
+        if (type === 'prompt') modalInput.focus();
+    });
+}
+
+function closeModal(result) {
+    modalOverlay.style.display = 'none';
+    if (modalResolve) {
+        modalResolve(result);
+        modalResolve = null;
+    }
+}
+
+modalCancel.onclick = () => closeModal(false);
+modalConfirm.onclick = () => {
+    if (modalInput.style.display === 'block') {
+        closeModal(modalInput.value);
+    } else {
+        closeModal(true);
+    }
+};
+
+modalInput.onkeydown = (e) => {
+    if (e.key === 'Enter') modalConfirm.click();
+    if (e.key === 'Escape') modalCancel.click();
+};
+
+async function customAlert(message, title = 'Alert') {
+    await showModal({ title, message, type: 'alert' });
+}
+
+async function customConfirm(message, title = 'Confirm', danger = false) {
+    return await showModal({ title, message, type: 'confirm', danger });
+}
+
+async function customPrompt(message, defaultValue = '', title = 'Input') {
+    const result = await showModal({ title, message, type: 'prompt', placeholder: defaultValue });
+    return result === false ? null : result;
+}
+
 function getCookie(name) {
     const value = `; ${document.cookie}`;
     const parts = value.split(`; ${name}=`);
@@ -25,11 +101,17 @@ async function login() {
     });
     showLoading(false);
     const data = await res.json();
-    if (data.success) location.reload();
+    if (data.success) {
+        if (data.data.encryptionKey) localStorage.setItem('encryptionKey', data.data.encryptionKey);
+        if (data.data.peerSecret) localStorage.setItem('peerSecret', data.data.peerSecret);
+        location.reload();
+    }
     else document.getElementById('auth-msg').innerText = data.error;
 }
 
 async function logout() {
+    localStorage.removeItem('encryptionKey');
+    localStorage.removeItem('peerSecret');
     await fetch('/api/logout', { method: 'POST' });
     location.reload();
 }
@@ -156,7 +238,7 @@ function goBack() {
 }
 
 async function renameFile(fileId, oldName) {
-    const newName = prompt('New filename:', oldName);
+    const newName = await customPrompt('New filename:', oldName, 'Rename File');
     if (!newName || newName === oldName) return;
     await fetch(`${CONTENT_URL}/files/rename`, {
         method: 'POST',
@@ -167,7 +249,7 @@ async function renameFile(fileId, oldName) {
 }
 
 async function renameFolder(oldName) {
-    const newFolderName = prompt('New folder name:', oldName);
+    const newFolderName = await customPrompt('New folder name:', oldName, 'Rename Folder');
     if (!newFolderName || newFolderName === oldName) return;
     
     const prefix = currentPath ? `${currentPath}/${oldName}/` : `${oldName}/`;
@@ -186,7 +268,7 @@ async function renameFolder(oldName) {
 }
 
 async function deleteFolder(folderName) {
-    if (!confirm('Delete folder and all its content?')) return;
+    if (!await customConfirm('Delete folder and all its content?', 'Delete Folder', true)) return;
     const prefix = currentPath ? `${currentPath}/${folderName}/` : `${folderName}/`;
     const affected = allFiles.filter(f => f.filename.startsWith(prefix));
     for (const file of affected) {
@@ -230,7 +312,7 @@ async function downloadFile(fileId) {
         a.download = filename || `file_${fileId}`;
         a.click();
     } catch (e) {
-        alert('Download failed: ' + e.message);
+        await customAlert('Download failed: ' + e.message, 'Error');
     }
     showLoading(false);
 }
@@ -278,11 +360,11 @@ async function updateAccount() {
         body: JSON.stringify({ username, password })
     });
     const data = await res.json();
-    if (data.success) alert('Account updated');
+    if (data.success) await customAlert('Account updated', 'Success');
 }
 
 async function deleteAccount() {
-    if (!confirm('Are you absolutely sure? This will delete your account and all files forever.')) return;
+    if (!await customConfirm('Are you absolutely sure? This will delete your account and all files forever.', 'Delete Account', true)) return;
     await fetch(`${CONTENT_URL}/files/user/${currentUser.userId}/all`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${currentUser.token}` }
@@ -295,7 +377,7 @@ async function deleteAccount() {
 }
 
 async function deleteAllFiles() {
-    if (!confirm('Delete all your files?')) return;
+    if (!await customConfirm('Delete all your files?', 'Delete All Files', true)) return;
     await fetch(`${CONTENT_URL}/files/user/${currentUser.userId}/all`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${currentUser.token}` }
@@ -309,8 +391,8 @@ window.onload = () => {
         currentUser = {
             token,
             userId: getCookie('userId'),
-            encryptionKey: getCookie('encryptionKey'),
-            peerSecret: getCookie('peerSecret'),
+            encryptionKey: localStorage.getItem('encryptionKey'),
+            peerSecret: localStorage.getItem('peerSecret'),
             username: getCookie('username')
         };
         document.getElementById('auth-screen').style.display = 'none';

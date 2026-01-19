@@ -369,11 +369,52 @@
 
         body { padding-top: 36px; }
         #auth-screen, #app-screen { height: calc(100vh - 36px); top: 36px; }
+        #custom-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 36px;
+            left: 0;
+            width: 100%;
+            height: calc(100% - 36px);
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(2px);
+        }
+        .modal-card {
+            background: var(--card-color);
+            border: 1px solid var(--border-color);
+            padding: 1.5rem;
+            border-radius: 8px;
+            width: 400px;
+            max-width: 90%;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .modal-title { margin: 0; font-size: 1.1rem; color: var(--text-primary); }
+        .modal-message { margin: 0; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 0.5rem; }
+        .modal-btn { width: auto; padding: 6px 16px; }
     </style>
 </head>
 <body>
     <div id="loading-overlay">
         <div class="loader"></div>
+    </div>
+
+    <div id="custom-modal-overlay">
+        <div class="modal-card">
+            <h3 id="modal-title" class="modal-title"></h3>
+            <p id="modal-message" class="modal-message"></p>
+            <input type="text" id="modal-input" style="display: none;" placeholder="">
+            <div class="modal-actions">
+                <button id="modal-cancel" class="secondary modal-btn"></button>
+                <button id="modal-confirm" class="modal-btn"></button>
+            </div>
+        </div>
     </div>
 
     <div id="title-bar">
@@ -561,6 +602,81 @@
         let currentPath = '';
         let allFiles = [];
         let uploadCancelled = false;
+
+        const modalOverlay = document.getElementById('custom-modal-overlay');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalInput = document.getElementById('modal-input');
+        const modalCancel = document.getElementById('modal-cancel');
+        const modalConfirm = document.getElementById('modal-confirm');
+        
+        let modalResolve = null;
+
+        function showModal({ title, message, type = 'alert', placeholder = '', confirmText = 'OK', cancelText = 'Cancel', danger = false }) {
+            return new Promise((resolve) => {
+                modalResolve = resolve;
+                modalTitle.innerText = title;
+                modalMessage.innerText = message;
+                modalInput.value = '';
+                
+                modalInput.style.display = type === 'prompt' ? 'block' : 'none';
+                if (type === 'prompt' && placeholder) modalInput.placeholder = placeholder;
+                
+                modalCancel.style.display = type === 'alert' ? 'none' : 'block';
+                modalCancel.innerText = cancelText;
+                
+                modalConfirm.innerText = confirmText;
+                if (danger) {
+                    modalConfirm.classList.add('danger');
+                    modalConfirm.style.background = 'rgba(239, 68, 68, 0.1)';
+                    modalConfirm.style.color = 'var(--danger-color)';
+                    modalConfirm.style.borderColor = 'var(--danger-color)';
+                } else {
+                    modalConfirm.classList.remove('danger');
+                    modalConfirm.style.background = 'var(--accent-color)';
+                    modalConfirm.style.color = '#000';
+                    modalConfirm.style.borderColor = 'var(--accent-color)';
+                }
+
+                modalOverlay.style.display = 'flex';
+                if (type === 'prompt') modalInput.focus();
+            });
+        }
+
+        function closeModal(result) {
+            modalOverlay.style.display = 'none';
+            if (modalResolve) {
+                modalResolve(result);
+                modalResolve = null;
+            }
+        }
+
+        modalCancel.onclick = () => closeModal(false);
+        modalConfirm.onclick = () => {
+            if (modalInput.style.display === 'block') {
+                closeModal(modalInput.value);
+            } else {
+                closeModal(true);
+            }
+        };
+
+        modalInput.onkeydown = (e) => {
+            if (e.key === 'Enter') modalConfirm.click();
+            if (e.key === 'Escape') modalCancel.click();
+        };
+
+        async function customAlert(message, title = 'Alert') {
+            await showModal({ title, message, type: 'alert' });
+        }
+
+        async function customConfirm(message, title = 'Confirm', danger = false) {
+            return await showModal({ title, message, type: 'confirm', danger });
+        }
+
+        async function customPrompt(message, defaultValue = '', title = 'Input') {
+            const result = await showModal({ title, message, type: 'prompt', placeholder: defaultValue });
+            return result === false ? null : result;
+        }
 
         async function cancelUpload() {
             uploadCancelled = true;
@@ -760,14 +876,14 @@
         }
 
         async function renameFile(fileId, oldName) {
-            const newName = prompt('New filename:', oldName);
+            const newName = await customPrompt('New filename:', oldName, 'Rename File');
             if (!newName || newName === oldName) return;
             const res = await window.api.renameFile(fileId, newName);
             if (res.success) refreshFiles();
         }
 
         async function renameFolder(oldName) {
-            const newFolderName = prompt('New folder name:', oldName);
+            const newFolderName = await customPrompt('New folder name:', oldName, 'Rename Folder');
             if (!newFolderName || newFolderName === oldName) return;
             
             const prefix = currentPath ? `${currentPath}/${oldName}/` : `${oldName}/`;
@@ -784,7 +900,7 @@
         }
 
         async function deleteFolder(folderName) {
-            if (!confirm('Delete folder and all its content?')) return;
+            if (!await customConfirm('Delete folder and all its content?', 'Delete Folder', true)) return;
             const prefix = currentPath ? `${currentPath}/${folderName}/` : `${folderName}/`;
             const affected = allFiles.filter(f => f.filename.startsWith(prefix));
             showLoading(true);
@@ -843,9 +959,9 @@
             document.getElementById('upload-zone-folder').style.pointerEvents = 'auto';
             
             if(uploadCancelled) {
-                alert('Upload cancelled.');
+                await customAlert('Upload cancelled.', 'Upload');
             } else {
-                alert('Folder upload complete.');
+                await customAlert('Folder upload complete.', 'Upload');
             }
             refreshFiles();
         }
@@ -905,11 +1021,11 @@
             showLoading(true);
             const Vk = await window.api.downloadFile(id);
             showLoading(false);
-            if(Vk.error) alert('Error: ' + Vk.error);
+            if(Vk.error) await customAlert('Error: ' + Vk.error, 'Download Error');
         }
 
         async function deleteFile(id) {
-            if(!confirm('Permanently delete this file?')) return;
+            if(!await customConfirm('Permanently delete this file?', 'Delete File', true)) return;
             const res = await window.api.deleteFile(id);
             if(res.success) refreshFiles();
         }
@@ -923,29 +1039,29 @@
             const res = await window.api.updateAccount({ username: u, password: p });
             showLoading(false);
             if(res.success) { 
-                alert('Account updated!');
+                await customAlert('Account updated!', 'Success');
                 document.getElementById('new-username').value = '';
                 document.getElementById('new-password').value = '';
             }
-            else alert('Error: ' + res.error);
+            else await customAlert('Error: ' + res.error, 'Error');
         }
 
         async function deleteAllFiles() {
-            if(!confirm('WARNING: This will permanently delete ALL your files. This cannot be undone. Continue?')) return;
+            if(!await customConfirm('WARNING: This will permanently delete ALL your files. This cannot be undone. Continue?', 'Delete All Files', true)) return;
             showLoading(true);
             const res = await window.api.deleteAllFiles(currentUser.userId);
             showLoading(false);
-            if(res.success) { alert('All files deleted.'); refreshFiles(); loadProfile(); }
-            else alert('Error: ' + res.error);
+            if(res.success) { await customAlert('All files deleted.', 'Success'); refreshFiles(); loadProfile(); }
+            else await customAlert('Error: ' + res.error, 'Error');
         }
 
         async function deleteAccount() {
-            if(!confirm('WARNING: This will delete your account and ALL data. Are you sure?')) return;
+            if(!await customConfirm('WARNING: This will delete your account and ALL data. Are you sure?', 'Delete Account', true)) return;
             showLoading(true);
             const res = await window.api.deleteAccount();
             showLoading(false);
             if(res.success) location.reload(); 
-            else alert('Error: ' + res.error);
+            else await customAlert('Error: ' + res.error, 'Error');
         }
 
         async function logout() {
