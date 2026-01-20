@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <div id="login-view" class="container login-container" style="display: none;">
+            <div class="card">
+                <h1>Admin Login</h1>
+                <div class="login-form">
+                    <input type="password" id="admin-token" placeholder="Enter Admin Token" class="form-group input-field">
+                    <button id="login-btn" class="btn btn-primary">Login</button>
+                    <p id="login-error" class="error-msg"></p>
+                </div>
+            </div>
+        </div>
+
+        <div id="dashboard-view" class="container" style="display: none;">
+            <div class="card">
+                <div class="header-row">
+                    <h1>Admin Dashboard</h1>
+                    <button id="logout-btn" class="btn btn-outline">Logout</button>
+                </div>
+                <div class="tabs">
+                    <div class="tab active" data-tab="pending">Pending Approvals <span id="pending-count" class="badge pending">0</span></div>
+                    <div class="tab" data-tab="all">All Users</div>
+                </div>
+                <div id="content">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-modal" class="modal-overlay">
+        <div class="modal">
+            <h2>Edit User</h2>
+            <input type="hidden" id="edit-id">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="edit-username" class="input-field">
+            </div>
+            <div class="form-group">
+                <label>Storage Limit (GB)</label>
+                <input type="number" id="edit-limit" step="0.1" class="input-field">
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select id="edit-status" class="input-field">
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button id="modal-cancel-btn" class="btn btn-outline">Cancel</button>
+                <button id="modal-save-btn" class="btn btn-primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

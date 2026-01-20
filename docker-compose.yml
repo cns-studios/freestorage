@@ -37,7 +37,7 @@ services:
       context: ./userdata-server
     container_name: freestorage-admin
     restart: unless-stopped
-    command: node admin.js
+    command: node admin/server.js
     volumes:
       - ./userdata-server/data:/app/data
     environment:
