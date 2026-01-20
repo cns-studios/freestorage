@@ -1,5 +1,6 @@
 const express = require('express');
 const sqlite3 = require('sqlite3');
+const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 3004;
 const DB_PATH = process.env.DB_PATH || './data/userdata.db';
@@ -14,14 +15,62 @@ const db = new sqlite3.Database(DB_PATH);
 
 app.use(express.json());
 
-const checkToken = (req, res, next) => {
-    if (req.headers['x-admin-token'] !== ADMIN_TOKEN) {
-        return res.status(403).send('Forbidden');
+const parseCookies = (req) => {
+    const list = {};
+    const rc = req.headers.cookie;
+    rc && rc.split(';').forEach(function(cookie) {
+        const parts = cookie.split('=');
+        list[parts.shift().trim()] = decodeURI(parts.join('='));
+    });
+    return list;
+};
+
+const checkAuth = (req, res, next) => {
+    const cookies = parseCookies(req);
+    const token = cookies.admin_token;
+    
+    if (token !== ADMIN_TOKEN) {
+        if (req.path === '/' && req.method === 'GET') {
+            req.isAuthed = false;
+            return next();
+        }
+        return res.status(403).json({ error: 'Forbidden' });
     }
+
+    if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
+        const csrfCookie = cookies.csrf_token;
+        const csrfHeader = req.headers['x-csrf-token'];
+        
+        if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
+            return res.status(403).json({ error: 'CSRF Token Mismatch' });
+        }
+    }
+    
     next();
 };
 
+app.post('/api/login', (req, res) => {
+    const { token } = req.body;
+    if (token === ADMIN_TOKEN) {
+        const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+        
+        let cookieOpts = `Path=/; HttpOnly; SameSite=Strict; Max-Age=86400`;
+        if (isSecure) cookieOpts += '; Secure';
+        res.setHeader('Set-Cookie', [
+            `admin_token=${token}; ${cookieOpts}`,
+            `csrf_token=${crypto.randomBytes(16).toString('hex')}; Path=/; SameSite=Strict; Max-Age=86400${isSecure ? '; Secure' : ''}`
+        ]);
+        
+        res.json({ success: true });
+    } else {
+        res.status(401).json({ error: 'Invalid Token' });
+    }
+});
+
 app.get('/', (req, res) => {
+    const cookies = parseCookies(req);
+    const isAuthed = cookies.admin_token === ADMIN_TOKEN;
+
     res.send(`
         <!DOCTYPE html>
         <html>
@@ -54,25 +103,45 @@ app.get('/', (req, res) => {
                 .btn-outline { border-color: #d1d5db; background: white; color: #374151; }
                 .btn:hover { opacity: 0.9; }
 
-                /* Modal */
                 .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
                 .modal { background: white; padding: 2rem; border-radius: 8px; width: 400px; max-width: 90%; }
                 .form-group { margin-bottom: 1rem; }
                 .form-group label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 500; }
                 .form-group input, .form-group select { width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; }
                 .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; }
+
+                .login-container { max-width: 400px; margin: 4rem auto; }
+                .login-form { display: flex; flex-direction: column; gap: 1rem; }
             </style>
         </head>
         <body>
-            <div class="container">
-                <div class="card">
-                    <h1>Admin Dashboard</h1>
-                    <div class="tabs">
-                        <div class="tab active" onclick="setTab('pending')">Pending Approvals <span id="pending-count" class="badge pending">0</span></div>
-                        <div class="tab" onclick="setTab('all')">All Users</div>
+            <div id="app">
+                ${!isAuthed ? `
+                    <div class="container login-container">
+                        <div class="card">
+                            <h1>Admin Login</h1>
+                            <div class="login-form">
+                                <input type="password" id="admin-token" placeholder="Enter Admin Token" class="form-group" style="padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px;">
+                                <button class="btn btn-primary" onclick="login()" style="padding: 0.75rem; font-size: 1rem;">Login</button>
+                                <p id="login-error" style="color: var(--danger); display: none;"></p>
+                            </div>
+                        </div>
                     </div>
-                    <div id="content">Loading...</div>
-                </div>
+                ` : `
+                    <div class="container">
+                        <div class="card">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <h1>Admin Dashboard</h1>
+                                <button class="btn btn-outline" onclick="logout()">Logout</button>
+                            </div>
+                            <div class="tabs">
+                                <div class="tab active" onclick="setTab('pending')">Pending Approvals <span id="pending-count" class="badge pending">0</span></div>
+                                <div class="tab" onclick="setTab('all')">All Users</div>
+                            </div>
+                            <div id="content">Loading...</div>
+                        </div>
+                    </div>
+                `}
             </div>
 
             <div id="edit-modal" class="modal-overlay">
@@ -102,44 +171,91 @@ app.get('/', (req, res) => {
             </div>
 
             <script>
-                let ADMIN_TOKEN = localStorage.getItem('admin_token');
-                if (!ADMIN_TOKEN) {
-                    ADMIN_TOKEN = prompt('Enter Admin Token');
-                    if(ADMIN_TOKEN) localStorage.setItem('admin_token', ADMIN_TOKEN);
-                }
-
+                const isAuthed = ${isAuthed};
                 let users = [];
                 let currentTab = 'pending';
 
-                async function fetchUsers() {
-                    const res = await fetch('/api/users', {
-                        headers: { 'X-Admin-Token': ADMIN_TOKEN }
+                function getCookie(name) {
+                    const value = `;
+ ${document.cookie}`;
+                    const parts = value.split(`;
+ ${name}=`);
+                    if (parts.length === 2) return parts.pop().split(';').shift();
+                }
+
+                async function login() {
+                    const token = document.getElementById('admin-token').value;
+                    const res = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token })
                     });
-                    if (res.status === 403) {
-                        localStorage.removeItem('admin_token');
-                        alert('Invalid Token');
+                    if (res.ok) {
                         location.reload();
-                        return;
+                    } else {
+                        document.getElementById('login-error').innerText = 'Invalid Token';
+                        document.getElementById('login-error').style.display = 'block';
                     }
-                    users = await res.json();
-                    render();
+                }
+
+                function logout() {
+                    document.cookie = 'admin_token=; Max-Age=0; Path=/;';
+                    document.cookie = 'csrf_token=; Max-Age=0; Path=/;';
+                    location.reload();
+                }
+
+                async function apiCall(url, method = 'GET', body = null) {
+                    const headers = { 'Content-Type': 'application/json' };
+                    if (method !== 'GET') {
+                        headers['X-CSRF-Token'] = getCookie('csrf_token');
+                    }
+                    
+                    const opts = { method, headers };
+                    if (body) opts.body = JSON.stringify(body);
+
+                    const res = await fetch(url, opts);
+                    if (res.status === 403) {
+                        location.reload();
+                        throw new Error('Forbidden');
+                    }
+                    return res.json();
+                }
+
+                async function fetchUsers() {
+                    if (!isAuthed) return;
+                    try {
+                        users = await apiCall('/api/users');
+                        render();
+                    } catch(e) {}
                 }
 
                 function setTab(tab) {
                     currentTab = tab;
                     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                    document.querySelector(`.tab[onclick="setTab('${tab}')"]`).classList.add('active');
+                    document.querySelector(".tab[onclick=\"setTab('" + tab + "')\"]").classList.add('active');
                     render();
+                }
+
+                function escapeHtml(text) {
+                    if (text == null) return '';
+                    return String(text)
+                        .replace(/&/g, "&amp;")
+                        .replace(/</g, "&lt;")
+                        .replace(/>/g, "&gt;")
+                        .replace(/"/g, "&quot;")
+                        .replace(/'/g, "&#039;");
                 }
 
                 function render() {
                     const pendingUsers = users.filter(u => u.status === 'pending');
-                    document.getElementById('pending-count').innerText = pendingUsers.length;
+                    const pendingBadge = document.getElementById('pending-count');
+                    if(pendingBadge) pendingBadge.innerText = pendingUsers.length;
 
                     const filtered = currentTab === 'pending' ? pendingUsers : users;
-
+                    const content = document.getElementById('content');
+                    
                     if (filtered.length === 0) {
-                        document.getElementById('content').innerHTML = '<p style="color:#6b7280; text-align:center;">No users found.</p>';
+                        content.innerHTML = '<p style="color:#6b7280; text-align:center;">No users found.</p>';
                         return;
                     }
 
@@ -152,49 +268,37 @@ app.get('/', (req, res) => {
                         
                         let actions = '';
                         if (u.status === 'pending') {
-                            actions = `
-                                <button class="btn btn-success" onclick="act(${u.id}, 'approve')">Approve</button>
-                                <button class="btn btn-danger" onclick="act(${u.id}, 'reject')">Reject</button>
-                            `;
+                            actions = '<button class="btn btn-success" onclick="act(' + u.id + ', \'approve\')">Approve</button>' +
+                                      '<button class="btn btn-danger" onclick="act(' + u.id + ', \'reject\')">Reject</button>';
                         } else {
-                            actions = `
-                                <button class="btn btn-outline" onclick="editUser(${u.id})">Edit</button>
-                                <button class="btn btn-danger" onclick="deleteUser(${u.id})">Delete</button>
-                            `;
+                            actions = '<button class="btn btn-outline" onclick="editUser(' + u.id + ')">Edit</button>' +
+                                      '<button class="btn btn-danger" onclick="deleteUser(' + u.id + ')">Delete</button>';
                         }
 
-                        html += `<tr>
-                            <td>${u.id}</td>
-                            <td>${u.username}</td>
-                            <td><span class="badge ${u.status}">${u.status}</span></td>
-                            <td>${u.storage_limit_gb} GB</td>
-                            <td>${usage} GB</td>
-                            <td>${online}</td>
-                            <td style="font-size:0.75rem">${lastPing}</td>
-                            <td>${actions}</td>
-                        </tr>`;
+                        html += '<tr>' +
+                            '<td>' + u.id + '</td>' +
+                            '<td>' + escapeHtml(u.username) + '</td>' +
+                            '<td><span class="badge ' + escapeHtml(u.status) + '">' + escapeHtml(u.status) + '</span></td>' +
+                            '<td>' + u.storage_limit_gb + ' GB</td>' +
+                            '<td>' + usage + ' GB</td>' +
+                            '<td>' + online + '</td>' +
+                            '<td style="font-size:0.75rem">' + escapeHtml(lastPing) + '</td>' +
+                            '<td>' + actions + '</td>' +
+                        '</tr>';
                     });
                     html += '</tbody></table>';
-                    document.getElementById('content').innerHTML = html;
+                    content.innerHTML = html;
                 }
 
                 async function act(id, action) {
                     if(!confirm(action + ' user ' + id + '?')) return;
-                    await fetch('/api/' + action, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN },
-                        body: JSON.stringify({ id })
-                    });
+                    await apiCall('/api/' + action, 'POST', { id });
                     fetchUsers();
                 }
 
                 async function deleteUser(id) {
                     if(!confirm('Permanently delete user ' + id + '? This cannot be undone.')) return;
-                    await fetch('/api/delete', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN },
-                        body: JSON.stringify({ id })
-                    });
+                    await apiCall('/api/delete', 'POST', { id });
                     fetchUsers();
                 }
 
@@ -218,30 +322,28 @@ app.get('/', (req, res) => {
                     const limit = document.getElementById('edit-limit').value;
                     const status = document.getElementById('edit-status').value;
 
-                    await fetch('/api/update', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN },
-                        body: JSON.stringify({ id, username, storage_limit_gb: limit, status })
-                    });
+                    await apiCall('/api/update', 'POST', { id, username, storage_limit_gb: limit, status });
                     closeModal();
                     fetchUsers();
                 }
 
-                fetchUsers();
+                if (isAuthed) fetchUsers();
             </script>
         </body>
         </html>
     `);
 });
 
-app.get('/api/users', checkToken, (req, res) => {
+app.use('/api', checkAuth);
+
+app.get('/api/users', (req, res) => {
     db.all("SELECT * FROM users ORDER BY created_at DESC", (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
 });
 
-app.post('/api/approve', checkToken, (req, res) => {
+app.post('/api/approve', (req, res) => {
     const { id } = req.body;
     db.run("UPDATE users SET status = 'approved' WHERE id = ?", [id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -249,7 +351,7 @@ app.post('/api/approve', checkToken, (req, res) => {
     });
 });
 
-app.post('/api/reject', checkToken, (req, res) => {
+app.post('/api/reject', (req, res) => {
     const { id } = req.body;
     db.run("DELETE FROM users WHERE id = ?", [id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -257,7 +359,7 @@ app.post('/api/reject', checkToken, (req, res) => {
     });
 });
 
-app.post('/api/delete', checkToken, (req, res) => {
+app.post('/api/delete', (req, res) => {
     const { id } = req.body;
     db.run("DELETE FROM users WHERE id = ?", [id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -265,11 +367,16 @@ app.post('/api/delete', checkToken, (req, res) => {
     });
 });
 
-app.post('/api/update', checkToken, (req, res) => {
+app.post('/api/update', (req, res) => {
     const { id, username, storage_limit_gb, status } = req.body;
+    
+    if (!['pending', 'approved'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' });
+    }
+    
     db.run(
         "UPDATE users SET username = ?, storage_limit_gb = ?, status = ? WHERE id = ?", 
-        [username, storage_limit_gb, status, id], 
+        [username, parseFloat(storage_limit_gb), status, id], 
         (err) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ success: true });
