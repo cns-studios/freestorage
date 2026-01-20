@@ -26,69 +26,208 @@ app.get('/', (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Admin Approval</title>
+            <title>Admin Dashboard</title>
             <style>
-                body { font-family: sans-serif; padding: 2rem; background: #f0f0f0; }
-                .container { max-width: 800px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-                table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-                th, td { text-align: left; padding: 10px; border-bottom: 1px solid #ddd; }
-                th { background: #fafafa; }
-                .btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; color: white; margin-right: 5px; }
-                .approve { background: #10b981; }
-                .reject { background: #ef4444; }
-                h1 { margin-top: 0; }
+                :root { --primary: #2563eb; --danger: #ef4444; --success: #10b981; --bg: #f3f4f6; --card: #ffffff; }
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 2rem; background: var(--bg); color: #1f2937; }
+                .container { max-width: 1200px; margin: 0 auto; }
+                .card { background: var(--card); padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+                h1 { margin: 0 0 1.5rem 0; font-size: 1.5rem; }
+                
+                .tabs { display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid #e5e7eb; }
+                .tab { padding: 0.5rem 1rem; cursor: pointer; border-bottom: 2px solid transparent; color: #6b7280; }
+                .tab.active { border-bottom-color: var(--primary); color: var(--primary); font-weight: 500; }
+                
+                table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+                th, td { text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid #e5e7eb; }
+                th { background: #f9fafb; font-weight: 600; color: #374151; }
+                tr:last-child td { border-bottom: none; }
+                
+                .badge { padding: 2px 6px; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+                .badge.pending { background: #fef3c7; color: #d97706; }
+                .badge.approved { background: #d1fae5; color: #059669; }
+                
+                .btn { padding: 4px 10px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-right: 4px; transition: all 0.2s; }
+                .btn-primary { background: var(--primary); color: white; }
+                .btn-danger { background: var(--danger); color: white; }
+                .btn-success { background: var(--success); color: white; }
+                .btn-outline { border-color: #d1d5db; background: white; color: #374151; }
+                .btn:hover { opacity: 0.9; }
+
+                /* Modal */
+                .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+                .modal { background: white; padding: 2rem; border-radius: 8px; width: 400px; max-width: 90%; }
+                .form-group { margin-bottom: 1rem; }
+                .form-group label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 500; }
+                .form-group input, .form-group select { width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; }
+                .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; }
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>Pending User Approvals</h1>
-                <div id="list">Loading...</div>
+                <div class="card">
+                    <h1>Admin Dashboard</h1>
+                    <div class="tabs">
+                        <div class="tab active" onclick="setTab('pending')">Pending Approvals <span id="pending-count" class="badge pending">0</span></div>
+                        <div class="tab" onclick="setTab('all')">All Users</div>
+                    </div>
+                    <div id="content">Loading...</div>
+                </div>
             </div>
+
+            <div id="edit-modal" class="modal-overlay">
+                <div class="modal">
+                    <h2 style="margin-top:0">Edit User</h2>
+                    <input type="hidden" id="edit-id">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="edit-username">
+                    </div>
+                    <div class="form-group">
+                        <label>Storage Limit (GB)</label>
+                        <input type="number" id="edit-limit" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="edit-status">
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+                        <button class="btn btn-primary" onclick="saveUser()">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+
             <script>
-                const ADMIN_TOKEN = prompt('Enter Admin Token');
-                async function load() {
+                let ADMIN_TOKEN = localStorage.getItem('admin_token');
+                if (!ADMIN_TOKEN) {
+                    ADMIN_TOKEN = prompt('Enter Admin Token');
+                    if(ADMIN_TOKEN) localStorage.setItem('admin_token', ADMIN_TOKEN);
+                }
+
+                let users = [];
+                let currentTab = 'pending';
+
+                async function fetchUsers() {
                     const res = await fetch('/api/users', {
                         headers: { 'X-Admin-Token': ADMIN_TOKEN }
                     });
                     if (res.status === 403) {
+                        localStorage.removeItem('admin_token');
                         alert('Invalid Token');
+                        location.reload();
                         return;
                     }
-                    const users = await res.json();
-                    const list = document.getElementById('list');
-                    if (users.length === 0) {
-                        list.innerHTML = '<p>No pending users.</p>';
+                    users = await res.json();
+                    render();
+                }
+
+                function setTab(tab) {
+                    currentTab = tab;
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelector(`.tab[onclick="setTab('${tab}')"]`).classList.add('active');
+                    render();
+                }
+
+                function render() {
+                    const pendingUsers = users.filter(u => u.status === 'pending');
+                    document.getElementById('pending-count').innerText = pendingUsers.length;
+
+                    const filtered = currentTab === 'pending' ? pendingUsers : users;
+
+                    if (filtered.length === 0) {
+                        document.getElementById('content').innerHTML = '<p style="color:#6b7280; text-align:center;">No users found.</p>';
                         return;
                     }
-                    let html = '<table><thead><tr><th>ID</th><th>Username</th><th>Registered</th><th>Actions</th></tr></thead><tbody>';
-                    users.forEach(u => {
-                        html += \`<tr>
-                            <td>\${u.id}</td>
-                            <td>\${u.username}</td>
-                            <td>\${new Date(u.created_at * 1000).toLocaleString()}</td>
-                            <td>
-                                <button class="btn approve" onclick="act(\${u.id}, 'approve')">Approve</button>
-                                <button class="btn reject" onclick="act(\${u.id}, 'reject')">Reject</button>
-                            </td>
-                        </tr>\`;
+
+                    let html = '<table><thead><tr><th>ID</th><th>Username</th><th>Status</th><th>Storage</th><th>Usage</th><th>Online</th><th>Last Ping</th><th>Actions</th></tr></thead><tbody>';
+                    
+                    filtered.forEach(u => {
+                        const usage = u.storage_used_gb ? u.storage_used_gb.toFixed(2) : '0.00';
+                        const lastPing = u.last_ping_time ? new Date(u.last_ping_time * 1000).toLocaleString() : '-';
+                        const online = u.total_online_minutes ? Math.floor(u.total_online_minutes / 60) + 'h ' + (u.total_online_minutes % 60) + 'm' : '0m';
+                        
+                        let actions = '';
+                        if (u.status === 'pending') {
+                            actions = `
+                                <button class="btn btn-success" onclick="act(${u.id}, 'approve')">Approve</button>
+                                <button class="btn btn-danger" onclick="act(${u.id}, 'reject')">Reject</button>
+                            `;
+                        } else {
+                            actions = `
+                                <button class="btn btn-outline" onclick="editUser(${u.id})">Edit</button>
+                                <button class="btn btn-danger" onclick="deleteUser(${u.id})">Delete</button>
+                            `;
+                        }
+
+                        html += `<tr>
+                            <td>${u.id}</td>
+                            <td>${u.username}</td>
+                            <td><span class="badge ${u.status}">${u.status}</span></td>
+                            <td>${u.storage_limit_gb} GB</td>
+                            <td>${usage} GB</td>
+                            <td>${online}</td>
+                            <td style="font-size:0.75rem">${lastPing}</td>
+                            <td>${actions}</td>
+                        </tr>`;
                     });
                     html += '</tbody></table>';
-                    list.innerHTML = html;
+                    document.getElementById('content').innerHTML = html;
                 }
-                
+
                 async function act(id, action) {
                     if(!confirm(action + ' user ' + id + '?')) return;
                     await fetch('/api/' + action, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Admin-Token': ADMIN_TOKEN
-                        },
+                        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN },
                         body: JSON.stringify({ id })
                     });
-                    load();
+                    fetchUsers();
                 }
-                load();
+
+                async function deleteUser(id) {
+                    if(!confirm('Permanently delete user ' + id + '? This cannot be undone.')) return;
+                    await fetch('/api/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN },
+                        body: JSON.stringify({ id })
+                    });
+                    fetchUsers();
+                }
+
+                function editUser(id) {
+                    const user = users.find(u => u.id === id);
+                    if (!user) return;
+                    document.getElementById('edit-id').value = user.id;
+                    document.getElementById('edit-username').value = user.username;
+                    document.getElementById('edit-limit').value = user.storage_limit_gb;
+                    document.getElementById('edit-status').value = user.status;
+                    document.getElementById('edit-modal').style.display = 'flex';
+                }
+
+                function closeModal() {
+                    document.getElementById('edit-modal').style.display = 'none';
+                }
+
+                async function saveUser() {
+                    const id = document.getElementById('edit-id').value;
+                    const username = document.getElementById('edit-username').value;
+                    const limit = document.getElementById('edit-limit').value;
+                    const status = document.getElementById('edit-status').value;
+
+                    await fetch('/api/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN },
+                        body: JSON.stringify({ id, username, storage_limit_gb: limit, status })
+                    });
+                    closeModal();
+                    fetchUsers();
+                }
+
+                fetchUsers();
             </script>
         </body>
         </html>
@@ -96,7 +235,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/users', checkToken, (req, res) => {
-    db.all("SELECT id, username, created_at FROM users WHERE status = 'pending'", (err, rows) => {
+    db.all("SELECT * FROM users ORDER BY created_at DESC", (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
@@ -116,6 +255,26 @@ app.post('/api/reject', checkToken, (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true });
     });
+});
+
+app.post('/api/delete', checkToken, (req, res) => {
+    const { id } = req.body;
+    db.run("DELETE FROM users WHERE id = ?", [id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
+});
+
+app.post('/api/update', checkToken, (req, res) => {
+    const { id, username, storage_limit_gb, status } = req.body;
+    db.run(
+        "UPDATE users SET username = ?, storage_limit_gb = ?, status = ? WHERE id = ?", 
+        [username, storage_limit_gb, status, id], 
+        (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        }
+    );
 });
 
 app.listen(PORT, () => {
