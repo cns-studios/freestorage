@@ -212,6 +212,7 @@ function renderFiles() {
                 </td>
             `;
         } else {
+            const sizeGb = (item.file_size_bytes / (1024 * 1024 * 1024)).toFixed(1);
             tr.innerHTML = `
                 <td>
                     <div class="cell-content">
@@ -219,7 +220,7 @@ function renderFiles() {
                         ${item.filename.split('/').pop()}
                     </div>
                 </td>
-                <td>${(item.file_size_bytes / (1024*1024)).toFixed(2)} MB</td>
+                <td>${sizeGb} GB</td>
                 <td style="text-align:right" class="file-actions">
                     <button class="action-btn" title="Rename" onclick="renameFile('${item.id}', '${item.filename}')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
                     <button class="action-btn" title="Download" onclick="downloadFile('${item.id}')"><svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
@@ -244,8 +245,15 @@ function goBack() {
 }
 
 async function renameFile(fileId, oldName) {
-    const newName = await customPrompt('New filename:', oldName, 'Rename File');
-    if (!newName || newName === oldName) return;
+    const lastDotIndex = oldName.lastIndexOf('.');
+    const ext = lastDotIndex !== -1 ? oldName.substring(lastDotIndex) : '';
+    const baseName = lastDotIndex !== -1 ? oldName.substring(0, lastDotIndex) : oldName;
+
+    const newBaseName = await customPrompt(`New filename (ending with ${ext}):`, baseName, 'Rename File');
+    if (!newBaseName || newBaseName === baseName) return;
+    
+    const newName = newBaseName + ext;
+    
     await fetch(`${CONTENT_URL}/files/rename`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentUser.token}` },

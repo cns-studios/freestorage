@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('api', {
     deleteAccount: () => ipcRenderer.invoke('delete-account'),
     deleteAllFiles: (userId) => ipcRenderer.invoke('delete-all-files', userId),
     onUploadProgress: (callback) => ipcRenderer.on('upload-progress', (event, data) => callback(data)),
+    cancelUpload: () => ipcRenderer.invoke('cancel-upload'),
     
     checkAuth: () => ipcRenderer.invoke('check-auth'),
     logout: () => ipcRenderer.invoke('logout'),

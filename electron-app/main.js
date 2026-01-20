@@ -10,6 +10,7 @@ let ws;
 let userData = {};
 let pingInterval;
 const pendingDownloads = new Map();
+let isCancelled = false;
 
 const USERDATA_URL = 'https://auth-freestorage.cns-studios.com';
 const CONTENT_URL = 'https://tracker-freestorage.cns-studios.com';
@@ -86,6 +87,11 @@ app.whenReady().then(createWindow);
 
 ipcMain.handle('window-minimize', () => mainWindow.minimize());
 ipcMain.handle('window-close', () => mainWindow.close());
+
+ipcMain.handle('cancel-upload', () => {
+    isCancelled = true;
+    return { success: true };
+});
 
 ipcMain.handle('check-auth', async () => {
     const creds = getSavedCredentials();
@@ -177,6 +183,7 @@ ipcMain.handle('register', async (event, { username, password }) => {
 ipcMain.handle('upload-file', async (event, { filePath, relativePath }) => {
     const filename = relativePath || path.basename(filePath);
     log('INFO', 'UPLOAD', `Starting upload: ${filename}`);
+    isCancelled = false;
     
     try {
         const stats = fs.statSync(filePath);
@@ -229,20 +236,24 @@ ipcMain.handle('upload-file', async (event, { filePath, relativePath }) => {
         };
 
         for await (const chunk of readStream) {
+            if (isCancelled) throw new Error('Upload cancelled');
             const encryptedChunk = cipher.update(chunk);
             buffer = Buffer.concat([buffer, encryptedChunk]);
             
             while (buffer.length >= CHUNK_SIZE) {
+                if (isCancelled) throw new Error('Upload cancelled');
                 const toUpload = buffer.slice(0, CHUNK_SIZE);
                 buffer = buffer.slice(CHUNK_SIZE);
                 await uploadChunk(toUpload, chunkIndex++);
             }
         }
         
+        if (isCancelled) throw new Error('Upload cancelled');
         const finalEncrypted = cipher.final();
         buffer = Buffer.concat([buffer, finalEncrypted]);
         
         if (buffer.length > 0) {
+            if (isCancelled) throw new Error('Upload cancelled');
             await uploadChunk(buffer, chunkIndex++);
         }
         

@@ -365,7 +365,7 @@ function checkFileCompletion(chunkId) {
 app.delete('/files/:fileId', authenticateToken, (req, res) => {
     const { fileId } = req.params;
     
-    db.get('SELECT user_id, file_size_bytes FROM files WHERE id = ?', [fileId], (err, file) => {
+    db.get('SELECT user_id, file_size_bytes, upload_status FROM files WHERE id = ?', [fileId], (err, file) => {
         if (!file) {
             log('WARN', req, `Delete failed: File ${fileId} not found`);
             return res.status(404).json({ error: 'File not found' });
@@ -384,12 +384,14 @@ app.delete('/files/:fileId', authenticateToken, (req, res) => {
                 return res.status(500).json({ error: 'Db error' });
             }
             
-            const sizeGb = file.file_size_bytes / (1024 * 1024 * 1024);
-            fetch(`${USERDATA_SERVER_URL}/update-storage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: file.user_id, addGb: -sizeGb, apiKey: INTERNAL_API_KEY })
-            }).catch(e => log('ERROR', null, `Failed to update storage usage: ${e.message}`));
+            if (file.upload_status === 'complete') {
+                const sizeGb = file.file_size_bytes / (1024 * 1024 * 1024);
+                fetch(`${USERDATA_SERVER_URL}/update-storage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: file.user_id, addGb: -sizeGb, apiKey: INTERNAL_API_KEY })
+                }).catch(e => log('ERROR', null, `Failed to update storage usage: ${e.message}`));
+            }
             
             log('INFO', req, `File deleted: ${fileId}`);
             res.json({ success: true });

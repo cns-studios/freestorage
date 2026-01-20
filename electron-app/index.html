@@ -682,6 +682,7 @@
         async function cancelUpload() {
             uploadCancelled = true;
             document.getElementById('global-progress-label').innerText = 'Cancelling...';
+            await window.api.cancelUpload();
         }
 
         function switchTab(tabId) {
@@ -835,7 +836,7 @@
                             </td>
                         `;
                     } else {
-                        const sizeMb = (item.file_size_bytes / (1024 * 1024)).toFixed(2);
+                        const sizeGb = (item.file_size_bytes / (1024 ** 3)).toFixed(1);
                         const statusClass = item.upload_status === 'complete' ? 'status-complete' : 'status-pending';
                         const displayName = search ? item.filename : item.filename.split('/').pop();
                         
@@ -846,7 +847,7 @@
                                     ${displayName}
                                 </div>
                             </td>
-                            <td style="color: var(--text-secondary);">${sizeMb} MB</td>
+                            <td style="color: var(--text-secondary);">${sizeGb} GB</td>
                             <td><span class="status-badge ${statusClass}">${item.upload_status}</span></td>
                             <td>
                                 <div class="action-btn-group" style="justify-content: flex-end;">
@@ -883,8 +884,14 @@
         }
 
         async function renameFile(fileId, oldName) {
-            const newName = await customPrompt('New filename:', oldName, 'Rename File');
-            if (!newName || newName === oldName) return;
+            const lastDotIndex = oldName.lastIndexOf('.');
+            const ext = lastDotIndex !== -1 ? oldName.substring(lastDotIndex) : '';
+            const baseName = lastDotIndex !== -1 ? oldName.substring(0, lastDotIndex) : oldName;
+
+            const newBaseName = await customPrompt(`New filename (ending with ${ext}):`, baseName, 'Rename File');
+            if (!newBaseName || newBaseName === baseName) return;
+            
+            const newName = newBaseName + ext;
             const res = await window.api.renameFile(fileId, newName);
             if (res.success) refreshFiles();
         }
