@@ -418,6 +418,19 @@
         </div>
     </div>
 
+    <div id="update-modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+        <div class="modal-card" style="width: 320px; align-items: center; text-align: center;">
+            <div id="update-spinner" class="loader" style="width: 32px; height: 32px; border-width: 3px;"></div>
+            <h3 id="update-status-title" style="margin: 1rem 0 0.5rem 0; font-size: 1.1rem; color: var(--text-primary);">Checking for updates...</h3>
+            <p id="update-status-text" style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;">Please wait.</p>
+            <div id="update-progress-container" style="width: 100%; margin-top: 1rem; display: none;">
+                <div class="progress-bar-bg"><div id="update-progress-bar" class="progress-fill" style="width: 0%"></div></div>
+                <div id="update-progress-text" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; text-align: right;">0%</div>
+            </div>
+            <button id="update-close-btn" class="secondary" style="margin-top: 1.5rem; display: none;" onclick="closeUpdateModal()">Close</button>
+        </div>
+    </div>
+
     <div id="title-bar">
         <div class="title-drag-area">
              <div class="logo-icon" style="width: 20px; height: 20px; background: transparent;">
@@ -1108,9 +1121,68 @@
         }
 
         function checkForUpdates() {
+            const overlay = document.getElementById('update-modal-overlay');
+            const title = document.getElementById('update-status-title');
+            const text = document.getElementById('update-status-text');
+            const spinner = document.getElementById('update-spinner');
+            const progressContainer = document.getElementById('update-progress-container');
+            const closeBtn = document.getElementById('update-close-btn');
+
+            overlay.style.display = 'flex';
+            spinner.style.display = 'block';
+            progressContainer.style.display = 'none';
+            closeBtn.style.display = 'none';
+            
+            title.innerText = 'Checking for updates...';
+            text.innerText = 'Connecting to server...';
+            
             window.api.checkForUpdates();
-            customAlert('Checking for updates... Watch the application logs/console for details.', 'Update Check');
         }
+
+        function closeUpdateModal() {
+            document.getElementById('update-modal-overlay').style.display = 'none';
+        }
+
+        // Update Event Listeners
+        window.api.onUpdateChecking(() => {
+            document.getElementById('update-status-text').innerText = 'Looking for new versions...';
+        });
+
+        window.api.onUpdateAvailable((info) => {
+            document.getElementById('update-status-title').innerText = 'Update Available';
+            document.getElementById('update-status-text').innerText = `Found version ${info.version}. Starting download...`;
+            document.getElementById('update-progress-container').style.display = 'block';
+        });
+
+        window.api.onUpdateNotAvailable((info) => {
+            document.getElementById('update-spinner').style.display = 'none';
+            document.getElementById('update-status-title').innerText = 'Up to Date';
+            document.getElementById('update-status-text').innerText = 'You are using the latest version.';
+            document.getElementById('update-close-btn').style.display = 'block';
+        });
+
+        window.api.onUpdateError((err) => {
+            document.getElementById('update-spinner').style.display = 'none';
+            document.getElementById('update-status-title').innerText = 'Update Failed';
+            document.getElementById('update-status-text').innerText = 'Error: ' + (err.message || err);
+            document.getElementById('update-status-text').style.color = 'var(--danger-color)';
+            document.getElementById('update-close-btn').style.display = 'block';
+        });
+
+        window.api.onDownloadProgress((progress) => {
+            const pct = Math.round(progress.percent);
+            document.getElementById('update-progress-bar').style.width = pct + '%';
+            document.getElementById('update-progress-text').innerText = pct + '%';
+            document.getElementById('update-status-text').innerText = `Downloading... (${(progress.transferred / 1024 / 1024).toFixed(1)} MB / ${(progress.total / 1024 / 1024).toFixed(1)} MB)`;
+        });
+
+        window.api.onUpdateDownloaded((info) => {
+            document.getElementById('update-spinner').style.display = 'none';
+            document.getElementById('update-status-title').innerText = 'Ready to Install';
+            document.getElementById('update-status-text').innerText = 'Update downloaded. It will be installed when you quit the app.';
+            document.getElementById('update-status-text').style.color = 'var(--success-color)';
+            document.getElementById('update-close-btn').style.display = 'block';
+        });
 
         initApp();
     </script>

@@ -20,5 +20,12 @@ contextBridge.exposeInMainWorld('api', {
     minimizeWindow: () => ipcRenderer.invoke('window-minimize'),
     closeWindow: () => ipcRenderer.invoke('window-close'),
     getAppVersion: () => ipcRenderer.invoke('get-app-version'),
-    checkForUpdates: () => ipcRenderer.invoke('check-for-updates')
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+    
+    onUpdateChecking: (cb) => ipcRenderer.on('update-checking', cb),
+    onUpdateAvailable: (cb) => ipcRenderer.on('update-available', (e, info) => cb(info)),
+    onUpdateNotAvailable: (cb) => ipcRenderer.on('update-not-available', (e, info) => cb(info)),
+    onUpdateError: (cb) => ipcRenderer.on('update-error', (e, err) => cb(err)),
+    onDownloadProgress: (cb) => ipcRenderer.on('download-progress', (e, progress) => cb(progress)),
+    onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', (e, info) => cb(info))
 });

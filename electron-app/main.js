@@ -120,18 +120,22 @@ autoUpdater.autoInstallOnAppQuit = true;
 
 autoUpdater.on('checking-for-update', () => {
     log('INFO', 'UPDATE', 'Checking for updates...');
+    if (mainWindow) mainWindow.webContents.send('update-checking');
 });
 
 autoUpdater.on('update-available', (info) => {
     log('INFO', 'UPDATE', `Update available: ${info.version}`);
+    if (mainWindow) mainWindow.webContents.send('update-available', info);
 });
 
 autoUpdater.on('update-not-available', (info) => {
     log('INFO', 'UPDATE', 'Update not available.');
+    if (mainWindow) mainWindow.webContents.send('update-not-available', info);
 });
 
 autoUpdater.on('error', (err) => {
     log('ERROR', 'UPDATE', `Error in auto-updater: ${err}`);
+    if (mainWindow) mainWindow.webContents.send('update-error', err.toString());
 });
 
 autoUpdater.on('download-progress', (progressObj) => {
@@ -139,10 +143,12 @@ autoUpdater.on('download-progress', (progressObj) => {
     log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
     log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
     log('INFO', 'UPDATE', log_message);
+    if (mainWindow) mainWindow.webContents.send('download-progress', progressObj);
 });
 
 autoUpdater.on('update-downloaded', (info) => {
     log('INFO', 'UPDATE', 'Update downloaded; will install on quit');
+    if (mainWindow) mainWindow.webContents.send('update-downloaded', info);
 });
 
 app.on('before-quit', () => {
