@@ -593,6 +593,10 @@
                         <button class="danger" onclick="deleteAccount()">Delete Account</button>
                     </div>
                 </div>
+
+                <div style="margin-top: 2rem; text-align: center; color: var(--text-tertiary); font-size: 0.75rem;">
+                    FreeStorage Desktop v<span id="app-version">...</span>
+                </div>
             </div>
         </div>
     </div>
@@ -1093,6 +1097,12 @@
                 document.getElementById('app-screen').style.display = 'flex';
                 loadProfile();
             }
+            loadVersion();
+        }
+
+        async function loadVersion() {
+            const ver = await window.api.getAppVersion();
+            document.getElementById('app-version').innerText = ver;
         }
 
         initApp();

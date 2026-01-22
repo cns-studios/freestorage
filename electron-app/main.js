@@ -87,8 +87,8 @@ function createTray() {
 
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
+        width: 1100,
+        height: 700,
         frame: false,
         backgroundColor: '#000000',
         titleBarStyle: 'hidden',
@@ -162,6 +162,16 @@ app.on('activate', () => {
 
 ipcMain.handle('window-minimize', () => mainWindow.minimize());
 ipcMain.handle('window-close', () => mainWindow.close());
+ipcMain.handle('get-app-version', () => {
+    try {
+        const versionPath = path.join(__dirname, 'version.json');
+        if (fs.existsSync(versionPath)) {
+            const versionData = JSON.parse(fs.readFileSync(versionPath));
+            return versionData.display;
+        }
+    } catch (e) {}
+    return app.getVersion();
+});
 
 ipcMain.handle('cancel-upload', () => {
     isCancelled = true;

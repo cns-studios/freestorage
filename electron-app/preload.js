@@ -18,5 +18,6 @@ contextBridge.exposeInMainWorld('api', {
     checkAuth: () => ipcRenderer.invoke('check-auth'),
     logout: () => ipcRenderer.invoke('logout'),
     minimizeWindow: () => ipcRenderer.invoke('window-minimize'),
-    closeWindow: () => ipcRenderer.invoke('window-close')
+    closeWindow: () => ipcRenderer.invoke('window-close'),
+    getAppVersion: () => ipcRenderer.invoke('get-app-version')
 });
