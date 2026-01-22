@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
@@ -6,6 +6,8 @@ const WebSocket = require('ws');
 const crypto = require('crypto');
 
 let mainWindow;
+let tray;
+let isQuitting = false;
 let ws;
 let userData = {};
 let pingInterval;
@@ -54,6 +56,35 @@ function getSavedCredentials() {
     return null;
 }
 
+function createTray() {
+    const iconPath = path.join(__dirname, 'build/icon.png');
+    const trayIcon = nativeImage.createFromPath(iconPath);
+    tray = new Tray(trayIcon.resize({ width: 16, height: 16 }));
+    
+    const contextMenu = Menu.buildFromTemplate([
+        { 
+            label: 'Show App', 
+            click: () => {
+                if (mainWindow) mainWindow.show();
+            } 
+        },
+        { 
+            label: 'Quit', 
+            click: () => {
+                isQuitting = true;
+                app.quit();
+            } 
+        }
+    ]);
+
+    tray.setToolTip('FreeStorage Desktop');
+    tray.setContextMenu(contextMenu);
+
+    tray.on('double-click', () => {
+        if (mainWindow) mainWindow.show();
+    });
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 800,
@@ -71,19 +102,63 @@ function createWindow() {
     
     mainWindow.loadFile('index.html');
 
-    autoUpdater.checkForUpdatesAndNotify();
+    mainWindow.on('close', (event) => {
+        if (!isQuitting) {
+            event.preventDefault();
+            mainWindow.hide();
+            return false;
+        }
+    });
 }
 
-autoUpdater.on('update-available', () => {
-    log('INFO', 'UPDATE', 'Update available');
+// Auto Updater Configuration
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+
+autoUpdater.on('checking-for-update', () => {
+    log('INFO', 'UPDATE', 'Checking for updates...');
 });
 
-autoUpdater.on('update-downloaded', () => {
-    log('INFO', 'UPDATE', 'Update downloaded; will install now');
-    autoUpdater.quitAndInstall();
+autoUpdater.on('update-available', (info) => {
+    log('INFO', 'UPDATE', `Update available: ${info.version}`);
 });
 
-app.whenReady().then(createWindow);
+autoUpdater.on('update-not-available', (info) => {
+    log('INFO', 'UPDATE', 'Update not available.');
+});
+
+autoUpdater.on('error', (err) => {
+    log('ERROR', 'UPDATE', `Error in auto-updater: ${err}`);
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+    let log_message = "Download speed: " + progressObj.bytesPerSecond;
+    log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
+    log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+    log('INFO', 'UPDATE', log_message);
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+    log('INFO', 'UPDATE', 'Update downloaded; will install on quit');
+});
+
+app.on('before-quit', () => {
+    isQuitting = true;
+});
+
+app.whenReady().then(() => {
+    createWindow();
+    createTray();
+    autoUpdater.checkForUpdates();
+});
+
+app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+    } else {
+        mainWindow.show();
+    }
+});
 
 ipcMain.handle('window-minimize', () => mainWindow.minimize());
 ipcMain.handle('window-close', () => mainWindow.close());
