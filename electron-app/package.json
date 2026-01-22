@@ -1,6 +1,6 @@
 {
   "name": "freestorage-desktop",
-  "version": "1.0.0",
+  "version": "0.1.11",
   "description": "Desktop client for FreeStorage",
   "author": {
     "name": "FreeStorage Maintainers",
@@ -13,9 +13,6 @@
   },
   "main": "main.js",
   "scripts": {
-    "gen-version": "node gen-version.js",
-    "prestart": "npm run gen-version",
-    "prebuild": "npm run gen-version",
     "start": "electron .",
     "dev": "electron .",
     "build": "electron-builder"

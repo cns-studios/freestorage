@@ -23,6 +23,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libarchive-tools rpm
+      - name: Set App Version
+        working-directory: ./electron-app
+        run: npm version ${GITHUB_REF_NAME#v} --no-git-tag-version
       - name: Build Linux
         working-directory: ./electron-app
         env:
@@ -92,6 +95,10 @@ jobs:
       - name: Install Dependencies
         working-directory: ./electron-app
         run: npm install
+      - name: Set App Version
+        working-directory: ./electron-app
+        shell: bash
+        run: npm version ${GITHUB_REF_NAME#v} --no-git-tag-version
       - name: Build Windows
         working-directory: ./electron-app
         env:
@@ -115,6 +122,9 @@ jobs:
       - name: Install Dependencies
         working-directory: ./electron-app
         run: npm install
+      - name: Set App Version
+        working-directory: ./electron-app
+        run: npm version ${GITHUB_REF_NAME#v} --no-git-tag-version
       - name: Build macOS
         working-directory: ./electron-app
         env:

@@ -179,15 +179,11 @@ app.on('activate', () => {
 
 ipcMain.handle('window-minimize', () => mainWindow.minimize());
 ipcMain.handle('window-close', () => mainWindow.close());
-ipcMain.handle('get-app-version', () => {
-    try {
-        const versionPath = path.join(__dirname, 'version.json');
-        if (fs.existsSync(versionPath)) {
-            const versionData = JSON.parse(fs.readFileSync(versionPath));
-            return versionData.display;
-        }
-    } catch (e) {}
-    return app.getVersion();
+ipcMain.handle('get-app-version', () => app.getVersion());
+
+ipcMain.handle('check-for-updates', () => {
+    log('INFO', 'UPDATE', 'Manual update check triggered');
+    autoUpdater.checkForUpdates();
 });
 
 ipcMain.handle('cancel-upload', () => {

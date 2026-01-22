@@ -596,6 +596,8 @@
 
                 <div style="margin-top: 2rem; text-align: center; color: var(--text-tertiary); font-size: 0.75rem;">
                     FreeStorage Desktop v<span id="app-version">...</span>
+                    <span style="margin: 0 8px;">•</span>
+                    <a href="#" onclick="checkForUpdates()" style="color: var(--text-secondary); text-decoration: none;">Check for Updates</a>
                 </div>
             </div>
         </div>
@@ -1103,6 +1105,11 @@
         async function loadVersion() {
             const ver = await window.api.getAppVersion();
             document.getElementById('app-version').innerText = ver;
+        }
+
+        function checkForUpdates() {
+            window.api.checkForUpdates();
+            customAlert('Checking for updates... Watch the application logs/console for details.', 'Update Check');
         }
 
         initApp();
