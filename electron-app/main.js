@@ -57,7 +57,10 @@ function getSavedCredentials() {
 }
 
 function createTray() {
-    const iconPath = path.join(__dirname, 'build/icon.png');
+    if (tray) return;
+    
+    const iconName = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+    const iconPath = path.join(__dirname, 'build', iconName);
     const trayIcon = nativeImage.createFromPath(iconPath);
     tray = new Tray(trayIcon.resize({ width: 16, height: 16 }));
     
@@ -146,11 +149,25 @@ app.on('before-quit', () => {
     isQuitting = true;
 });
 
-app.whenReady().then(() => {
-    createWindow();
-    createTray();
-    autoUpdater.checkForUpdates();
-});
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+    app.quit();
+} else {
+    app.on('second-instance', (event, commandLine, workingDirectory) => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.show();
+            mainWindow.focus();
+        }
+    });
+
+    app.whenReady().then(() => {
+        createWindow();
+        createTray();
+        autoUpdater.checkForUpdates();
+    });
+}
 
 app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
