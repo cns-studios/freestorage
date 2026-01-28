@@ -24,7 +24,7 @@ app.post('/api/login', async (req, res) => {
             body: JSON.stringify(req.body)
         });
         const data = await response.json();
-        
+
         if (data.token) {
             res.cookie('token', data.token, { maxAge: 7 * 24 * 60 * 60 * 1000, httpOnly: false });
             res.cookie('userId', data.userId, { maxAge: 7 * 24 * 60 * 60 * 1000, httpOnly: false });
@@ -46,6 +46,15 @@ app.post('/api/logout', (req, res) => {
     res.clearCookie('peerSecret');
     res.clearCookie('username');
     res.json({ success: true });
+});
+
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'healthy',
+        timestamp: Date.now(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage()
+    });
 });
 
 app.listen(PORT, () => {

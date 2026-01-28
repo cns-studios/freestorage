@@ -2,63 +2,63 @@ const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert');
 const { spawn } = require('node:child_process');
 const http = require('node:http');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 
 const API_PORT = 3101;
-const TEMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'freestorage-test-'));
-const TEMP_DB_PATH = path.join(TEMP_DIR, 'userdata.db');
+const DB_CONFIG = {
+    host: process.env.USERDATA_DB_HOST || 'localhost',
+    port: parseInt(process.env.USERDATA_DB_PORT) || 5432,
+    database: process.env.USERDATA_DB_NAME || 'freestorage_userdata_test',
+    user: process.env.USERDATA_DB_USER || 'postgres',
+    password: process.env.USERDATA_DB_PASSWORD || 'postgres'
+};
 
-function initTempDb() {
-    return new Promise((resolve) => {
-        const db = new sqlite3.Database(TEMP_DB_PATH);
-        db.serialize(() => {
-            db.run(`
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    encryption_key_encrypted TEXT NOT NULL,
-                    peer_secret TEXT,
-                    storage_limit_gb REAL DEFAULT 10.0,
-                    storage_used_gb REAL DEFAULT 0.0,
-                    total_online_minutes INTEGER DEFAULT 0,
-                    last_ping_time INTEGER,
-                    chunks_stored INTEGER DEFAULT 0,
-                    status TEXT DEFAULT 'pending'
-                )
-            `);
-            db.run(`
-                CREATE TABLE IF NOT EXISTS ping_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    ping_time INTEGER,
-                    FOREIGN KEY (user_id) REFERENCES users(id)
-                )
-            `, resolve);
-        });
-        db.close();
-    });
+const pool = new Pool(DB_CONFIG);
+
+async function initTestDb() {
+    const client = await pool.connect();
+    try {
+        await client.query('DROP TABLE IF EXISTS ping_logs CASCADE');
+        await client.query('DROP TABLE IF EXISTS users CASCADE');
+        await client.query(`
+            CREATE TABLE users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(255) UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                encryption_key_encrypted TEXT NOT NULL,
+                peer_secret TEXT NOT NULL,
+                storage_limit_gb DOUBLE PRECISION DEFAULT 10.0,
+                storage_used_gb DOUBLE PRECISION DEFAULT 0.0,
+                total_online_minutes INTEGER DEFAULT 0,
+                last_ping_time BIGINT,
+                chunks_stored INTEGER DEFAULT 0,
+                status VARCHAR(20) DEFAULT 'pending',
+                created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())::BIGINT
+            )
+        `);
+    } finally {
+        client.release();
+    }
 }
 
 function startServer() {
     return new Promise((resolve, reject) => {
-        const env = { 
-            ...process.env, 
+        const env = {
+            ...process.env,
             PORT: API_PORT,
-            DB_PATH: TEMP_DB_PATH
+            USERDATA_DB_NAME: DB_CONFIG.database
         };
         const server = spawn('node', ['userdata-server/index.js'], { env, stdio: 'pipe' });
-        
+
         server.stdout.on('data', (data) => {
-            if (data.toString().includes(`Userdata server running on port ${API_PORT}`)) {
+            if (data.toString().includes('Userdata server running on port ' + API_PORT)) {
                 resolve(server);
             }
         });
-        
-        server.stderr.on('data', (data) => console.error(`ERR: ${data}`));
+
+        server.stderr.on('data', (data) => {
+            if (!data.toString().includes('log')) console.error('ERR: ' + data);
+        });
     });
 }
 
@@ -72,8 +72,8 @@ function post(path, body, token) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Content-Length': data.length,
-                ...(token && { 'Authorization': `Bearer ${token}` })
+                'Content-Length': Buffer.byteLength(data),
+                ...(token && { 'Authorization': 'Bearer ' + token })
             }
         };
         const req = http.request(options, (res) => {
@@ -87,21 +87,20 @@ function post(path, body, token) {
     });
 }
 
-describe('Userdata Server (System Temp DB)', async () => {
+describe('Userdata Server (PostgreSQL Test DB)', async () => {
     let server;
-    let username = `user_test`;
+    let username = 'user_test_' + Date.now();
     let password = 'password123';
     let token;
 
     before(async () => {
-        await initTempDb();
+        await initTestDb();
         server = await startServer();
     });
 
-    after(() => {
+    after(async () => {
         if (server) server.kill();
-        // Cleanup temp dir
-        fs.rmSync(TEMP_DIR, { recursive: true, force: true });
+        await pool.end();
     });
 
     test('Register new user', async () => {
@@ -111,14 +110,7 @@ describe('Userdata Server (System Temp DB)', async () => {
     });
 
     test('Approve user', async () => {
-        const db = new sqlite3.Database(TEMP_DB_PATH);
-        await new Promise((resolve, reject) => {
-            db.run("UPDATE users SET status = 'approved' WHERE username = ?", [username], (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
-        db.close();
+        await pool.query("UPDATE users SET status = 'approved' WHERE username = $1", [username]);
     });
 
     test('Login user', async () => {
@@ -134,7 +126,7 @@ describe('Userdata Server (System Temp DB)', async () => {
                 hostname: 'localhost',
                 port: API_PORT,
                 path: '/profile',
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 'Authorization': 'Bearer ' + token }
             }, (resp) => {
                 let data = '';
                 resp.on('data', d => data += d);

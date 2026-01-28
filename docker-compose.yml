@@ -6,12 +6,21 @@ services:
     restart: unless-stopped
     ports:
       - "8086:8086"
-    volumes:
-      - ./userdata-server/data:/app/data
     environment:
       - PORT=8086
       - SECRET_KEY=${SECRET_KEY:-YOUR_SUPER_SECRET_KEY}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-YOUR_INTERNAL_SERVICE_KEY}
+      - USERDATA_DB_HOST=${USERDATA_DB_HOST}
+      - USERDATA_DB_PORT=${USERDATA_DB_PORT:-5432}
+      - USERDATA_DB_NAME=${USERDATA_DB_NAME:-freestorage_userdata}
+      - USERDATA_DB_USER=${USERDATA_DB_USER}
+      - USERDATA_DB_PASSWORD=${USERDATA_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8086/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   content-server:
     build:
@@ -21,16 +30,29 @@ services:
     ports:
       - "8085:8085"
       - "3002:3002"
-    volumes:
-      - ./content-server/data:/app/data
     environment:
       - HTTP_PORT=8085
       - WS_PORT=3002
       - USERDATA_SERVER_URL=http://userdata-server:8086
       - SECRET_KEY=${SECRET_KEY:-YOUR_SUPER_SECRET_KEY}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-YOUR_INTERNAL_SERVICE_KEY}
+      - CONTENT_DB_HOST=${CONTENT_DB_HOST}
+      - CONTENT_DB_PORT=${CONTENT_DB_PORT:-5432}
+      - CONTENT_DB_NAME=${CONTENT_DB_NAME:-freestorage_content}
+      - CONTENT_DB_USER=${CONTENT_DB_USER}
+      - CONTENT_DB_PASSWORD=${CONTENT_DB_PASSWORD}
+      - DRAGONFLY_HOST=${DRAGONFLY_HOST}
+      - DRAGONFLY_PORT=${DRAGONFLY_PORT:-6379}
+      - DRAGONFLY_PASSWORD=${DRAGONFLY_PASSWORD}
     depends_on:
-      - userdata-server
+      userdata-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8085/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   admin:
     build:
@@ -38,13 +60,23 @@ services:
     container_name: freestorage-admin
     restart: unless-stopped
     command: node admin/server.js
-    volumes:
-      - ./userdata-server/data:/app/data
     environment:
       - PORT=3004
       - ADMIN_TOKEN=${ADMIN_TOKEN:-YOUR_ADMIN_PASSWORD}
+      - USERDATA_DB_HOST=${USERDATA_DB_HOST}
+      - USERDATA_DB_PORT=${USERDATA_DB_PORT:-5432}
+      - USERDATA_DB_NAME=${USERDATA_DB_NAME:-freestorage_userdata}
+      - USERDATA_DB_USER=${USERDATA_DB_USER}
+      - USERDATA_DB_PASSWORD=${USERDATA_DB_PASSWORD}
     depends_on:
-      - userdata-server
+      userdata-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3004/auth-status', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   host:
     build:
@@ -57,19 +89,14 @@ services:
       - PORT=8087
       - USERDATA_SERVER_URL=http://userdata-server:8086
     depends_on:
-      - userdata-server
-
-  tunnel:
-    image: cloudflare/cloudflared:latest
-    container_name: freestorage-tunnel
-    restart: unless-stopped
-    command: tunnel run
-    environment:
-      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
-    depends_on:
-      - userdata-server
-      - content-server
-      - host
+      userdata-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8087/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   bot1:
     build:
@@ -82,7 +109,8 @@ services:
       - WS_URL=ws://content-server:3002
       - DATA_DIR=/bot-data
     depends_on:
-      - content-server
+      content-server:
+        condition: service_healthy
 
   bot2:
     build:
@@ -95,7 +123,8 @@ services:
       - WS_URL=ws://content-server:3002
       - DATA_DIR=/bot-data
     depends_on:
-      - content-server
+      content-server:
+        condition: service_healthy
 
   bot3:
     build:
@@ -108,7 +137,8 @@ services:
       - WS_URL=ws://content-server:3002
       - DATA_DIR=/bot-data
     depends_on:
-      - content-server
+      content-server:
+        condition: service_healthy
 
   bot4:
     build:
@@ -121,7 +151,8 @@ services:
       - WS_URL=ws://content-server:3002
       - DATA_DIR=/bot-data
     depends_on:
-      - content-server
+      content-server:
+        condition: service_healthy
 
   bot5:
     build:
@@ -134,4 +165,5 @@ services:
       - WS_URL=ws://content-server:3002
       - DATA_DIR=/bot-data
     depends_on:
-      - content-server
+      content-server:
+        condition: service_healthy

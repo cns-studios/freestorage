@@ -1,16 +1,21 @@
 const express = require('express');
-const sqlite3 = require('sqlite3');
+const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
 const app = express();
-const fs = require('fs');
-if (!fs.existsSync('./data')) fs.mkdirSync('./data');
-const DB_PATH = process.env.DB_PATH || './data/userdata.db';
-const db = new sqlite3.Database(DB_PATH);
 
-db.run('PRAGMA journal_mode=WAL;');
+const pool = new Pool({
+    host: process.env.USERDATA_DB_HOST || 'localhost',
+    port: parseInt(process.env.USERDATA_DB_PORT) || 5432,
+    database: process.env.USERDATA_DB_NAME || 'freestorage_userdata',
+    user: process.env.USERDATA_DB_USER || 'postgres',
+    password: process.env.USERDATA_DB_PASSWORD || 'postgres',
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000
+});
 
 app.use(express.json());
 
@@ -48,10 +53,37 @@ app.use((req, res, next) => {
     next();
 });
 
+app.get('/health', async (req, res) => {
+    const health = {
+        status: 'healthy',
+        timestamp: Date.now(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage()
+    };
+
+    try {
+        const start = Date.now();
+        const result = await pool.query('SELECT 1 as check');
+        health.database = {
+            status: 'connected',
+            latencyMs: Date.now() - start
+        };
+    } catch (err) {
+        health.status = 'unhealthy';
+        health.database = {
+            status: 'disconnected',
+            error: err.message
+        };
+    }
+
+    const statusCode = health.status === 'healthy' ? 200 : 503;
+    res.status(statusCode).json(health);
+});
+
 app.post('/register', async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
-        log('WARN', req, `Registration failed: Missing fields`);
+        log('WARN', req, 'Registration failed: Missing fields');
         return res.status(400).json({ error: 'Missing fields' });
     }
 
@@ -59,39 +91,34 @@ app.post('/register', async (req, res) => {
         const passwordHash = await bcrypt.hash(password, 10);
         const encryptionKey = crypto.randomBytes(32).toString('hex');
         const peerSecret = crypto.randomBytes(32).toString('hex');
-        
-        db.run(
-            'INSERT INTO users (username, password_hash, encryption_key_encrypted, peer_secret, status) VALUES (?, ?, ?, ?, ?)',
-            [username, passwordHash, encryptionKey, peerSecret, 'pending'],
-            function(err) {
-                if (err) {
-                    log('ERROR', req, `Registration failed for ${username}: ${err.message}`);
-                    return res.status(400).json({ error: 'Username exists or other error' });
-                }
-                
-                log('INFO', req, `New user registered (Pending Approval): ${username} (ID: ${this.lastID})`);
-                res.json({ message: 'Registration successful. Account pending admin approval.' });
-            }
+
+        const result = await pool.query(
+            `INSERT INTO users (username, password_hash, encryption_key_encrypted, peer_secret, status)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id`,
+            [username, passwordHash, encryptionKey, peerSecret, 'pending']
         );
-    } catch (e) {
-        log('ERROR', req, `Registration exception: ${e.message}`);
-        res.status(500).json({ error: 'Server error' });
+
+        log('INFO', req, `New user registered (Pending Approval): ${username} (ID: ${result.rows[0].id})`);
+        res.json({ message: 'Registration successful. Account pending admin approval.' });
+    } catch (err) {
+        log('ERROR', req, `Registration failed for ${username}: ${err.message}`);
+        res.status(400).json({ error: 'Username exists or other error' });
     }
 });
 
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
-    
-    db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
-        if (err) {
-            log('ERROR', req, `Login db error: ${err.message}`);
-            return res.status(500).json({ error: 'Db error' });
-        }
+
+    try {
+        const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+        const user = result.rows[0];
+
         if (!user) {
             log('WARN', req, `Login failed: User not found (${username})`);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
-        
+
         const valid = await bcrypt.compare(password, user.password_hash);
         if (!valid) {
             log('WARN', req, `Login failed: Invalid password for ${username}`);
@@ -102,7 +129,7 @@ app.post('/login', async (req, res) => {
             log('WARN', req, `Login failed: Account pending approval for ${username}`);
             return res.status(403).json({ error: 'Account pending admin approval.' });
         }
-        
+
         const token = jwt.sign({ userId: user.id }, SECRET_KEY);
         log('INFO', req, `User logged in: ${username} (ID: ${user.id})`);
         res.json({
@@ -113,7 +140,10 @@ app.post('/login', async (req, res) => {
             storageLimitGb: user.storage_limit_gb,
             storageUsedGb: user.storage_used_gb
         });
-    });
+    } catch (err) {
+        log('ERROR', req, `Login db error: ${err.message}`);
+        res.status(500).json({ error: 'Db error' });
+    }
 });
 
 function authenticateToken(req, res, next) {
@@ -122,7 +152,7 @@ function authenticateToken(req, res, next) {
         log('WARN', req, 'Auth failed: No token');
         return res.status(401).json({ error: 'No token' });
     }
-    
+
     jwt.verify(token, SECRET_KEY, (err, decoded) => {
         if (err) {
             log('WARN', req, 'Auth failed: Invalid token');
@@ -133,76 +163,64 @@ function authenticateToken(req, res, next) {
     });
 }
 
-app.post('/sync-contribution', (req, res) => {
+app.post('/sync-contribution', async (req, res) => {
     const { userId, chunksStored, apiKey } = req.body;
     if (apiKey !== INTERNAL_API_KEY) return res.status(403).json({ error: 'Unauthorized' });
-    
-    db.run('UPDATE users SET chunks_stored = ? WHERE id = ?', [chunksStored, userId], (err) => {
-        if (err) return res.status(500).json({ error: 'Db error' });
+
+    try {
+        await pool.query('UPDATE users SET chunks_stored = $1 WHERE id = $2', [chunksStored, userId]);
         res.json({ success: true });
-    });
+    } catch (err) {
+        res.status(500).json({ error: 'Db error' });
+    }
 });
 
-app.post('/ping', authenticateToken, (req, res) => {
+app.post('/ping', authenticateToken, async (req, res) => {
     const userId = req.userId;
     const now = Math.floor(Date.now() / 1000);
-    
-    db.get('SELECT last_ping_time FROM users WHERE id = ?', [userId], (err, user) => {
-        if (err || !user) {
+
+    try {
+        const userResult = await pool.query('SELECT last_ping_time, total_online_minutes, chunks_stored FROM users WHERE id = $1', [userId]);
+        const user = userResult.rows[0];
+
+        if (!user) {
             log('ERROR', req, `Ping db error for user ${userId}`);
             return res.status(500).json({ error: 'Db error' });
         }
-        
+
         if (user.last_ping_time && (now - user.last_ping_time) < 290) {
             log('WARN', req, `Ping rate limit exceeded for user ${userId}`);
             return res.status(429).json({ error: 'Ping rate limit exceeded. Please wait.' });
         }
 
-        db.run('INSERT INTO ping_logs (user_id, ping_time) VALUES (?, ?)', [userId, now], (err) => {
-            if (err) {
-                log('ERROR', req, `Failed to log ping for user ${userId}`);
-                return res.status(500).json({ error: 'Failed to log ping' });
+        const newTotalMinutes = user.total_online_minutes + 5;
+
+        await pool.query(
+            'UPDATE users SET total_online_minutes = $1, last_ping_time = $2 WHERE id = $3',
+            [newTotalMinutes, now, userId]
+        );
+
+        log('DEBUG', req, `Ping received from UserID: ${userId}. Total Uptime: ${newTotalMinutes} mins`);
+
+        if (newTotalMinutes >= 4320) {
+            if (user.chunks_stored >= 100) {
+                await pool.query(
+                    'UPDATE users SET storage_limit_gb = storage_limit_gb + 1, total_online_minutes = 0 WHERE id = $1',
+                    [userId]
+                );
+                log('INFO', req, `UserID: ${userId} earned +1GB storage for 72h uptime and 100+ chunks!`);
+                return res.json({ message: 'Ping recorded. +1GB storage earned!', newLimit: true });
+            } else {
+                log('WARN', req, `UserID: ${userId} reached uptime goal but lacks chunks_stored proof.`);
+                return res.json({ message: 'Ping recorded. Uptime goal reached, but more chunks must be stored to earn reward.', totalMinutes: newTotalMinutes });
             }
+        }
 
-            db.all(
-                'SELECT ping_time FROM ping_logs WHERE user_id = ?',
-                [userId],
-                (err, pings) => {
-                    if (err) return res.status(500).json({ error: 'Db error' });
-
-                    const totalMinutes = pings.length * 5;
-                    log('DEBUG', req, `Ping received from UserID: ${userId}. Total Uptime: ${totalMinutes} mins`);
-                    
-                    db.run(
-                        'UPDATE users SET total_online_minutes = ?, last_ping_time = ? WHERE id = ?',
-                        [totalMinutes, now, userId],
-                        (err) => {
-                            if (err) log('ERROR', req, `Update user stats failed: ${err.message}`);
-                        }
-                    );
-                    
-                    db.get('SELECT chunks_stored FROM users WHERE id = ?', [userId], (err, userStats) => {
-                        if (totalMinutes >= 4320) {
-                            if (userStats && userStats.chunks_stored >= 100) {
-                                db.run(
-                                    'UPDATE users SET storage_limit_gb = storage_limit_gb + 1, total_online_minutes = 0 WHERE id = ?',
-                                    [userId]
-                                );
-                                db.run('DELETE FROM ping_logs WHERE user_id = ?', [userId]);
-                                log('INFO', req, `UserID: ${userId} earned +1GB storage for 72h uptime and 100+ chunks!`);
-                                res.json({ message: 'Ping recorded. +1GB storage earned!', newLimit: true });
-                            } else {
-                                log('WARN', req, `UserID: ${userId} reached uptime goal but lacks chunks_stored proof.`);
-                                res.json({ message: 'Ping recorded. Uptime goal reached, but more chunks must be stored to earn reward.', totalMinutes });
-                            }
-                        } else {
-                            res.json({ message: 'Ping recorded', totalMinutes });
-                        }
-                    });
-                }
-            );
-        });
-    });
+        res.json({ message: 'Ping recorded', totalMinutes: newTotalMinutes });
+    } catch (err) {
+        log('ERROR', req, `Ping error: ${err.message}`);
+        res.status(500).json({ error: 'Db error' });
+    }
 });
 
 app.put('/user', authenticateToken, async (req, res) => {
@@ -212,88 +230,91 @@ app.put('/user', authenticateToken, async (req, res) => {
     try {
         const updates = [];
         const values = [];
+        let paramIndex = 1;
 
         if (username) {
-            updates.push('username = ?');
+            updates.push(`username = $${paramIndex++}`);
             values.push(username);
         }
 
         if (password) {
             const hash = await bcrypt.hash(password, 10);
-            updates.push('password_hash = ?');
+            updates.push(`password_hash = $${paramIndex++}`);
             values.push(hash);
         }
 
         if (updates.length === 0) return res.json({ success: true });
 
         values.push(userId);
-        db.run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values, function(err) {
-            if (err) {
-                log('ERROR', req, `Account update failed for user ${userId}: ${err.message}`);
-                return res.status(500).json({ error: 'Update failed (Username might be taken)' });
-            }
-            log('INFO', req, `Account updated for user ${userId}`);
-            res.json({ success: true });
-        });
-    } catch (e) {
-        log('ERROR', req, `Account update exception: ${e.message}`);
-        res.status(500).json({ error: e.message });
+        await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIndex}`, values);
+
+        log('INFO', req, `Account updated for user ${userId}`);
+        res.json({ success: true });
+    } catch (err) {
+        log('ERROR', req, `Account update failed for user ${userId}: ${err.message}`);
+        res.status(500).json({ error: 'Update failed (Username might be taken)' });
     }
 });
 
-app.delete('/user', authenticateToken, (req, res) => {
+app.delete('/user', authenticateToken, async (req, res) => {
     const userId = req.userId;
-    db.run('DELETE FROM ping_logs WHERE user_id = ?', [userId]);
-    db.run('DELETE FROM users WHERE id = ?', [userId], (err) => {
-        if (err) {
-            log('ERROR', req, `Account deletion failed for user ${userId}`);
-            return res.status(500).json({ error: 'Db error' });
-        }
+
+    try {
+        await pool.query('DELETE FROM users WHERE id = $1', [userId]);
         log('WARN', req, `Account deleted for user ${userId}`);
         res.json({ success: true });
-    });
+    } catch (err) {
+        log('ERROR', req, `Account deletion failed for user ${userId}`);
+        res.status(500).json({ error: 'Db error' });
+    }
 });
 
-app.post('/reset-storage', (req, res) => {
+app.post('/reset-storage', async (req, res) => {
     const { userId, apiKey } = req.body;
     if (apiKey !== INTERNAL_API_KEY) return res.status(403).json({ error: 'Unauthorized' });
-    
-    db.run('UPDATE users SET storage_used_gb = 0 WHERE id = ?', [userId], (err) => {
-        if (err) return res.status(500).json({ error: 'Db error' });
+
+    try {
+        await pool.query('UPDATE users SET storage_used_gb = 0 WHERE id = $1', [userId]);
         res.json({ success: true });
-    });
+    } catch (err) {
+        res.status(500).json({ error: 'Db error' });
+    }
 });
 
-app.post('/update-storage', (req, res) => {
+app.post('/update-storage', async (req, res) => {
     const { userId, addGb, apiKey } = req.body;
     if (apiKey !== INTERNAL_API_KEY) {
         log('WARN', req, 'Unauthorized storage update attempt');
         return res.status(403).json({ error: 'Unauthorized' });
     }
-    
-    db.run(
-        'UPDATE users SET storage_used_gb = storage_used_gb + ? WHERE id = ?',
-        [addGb, userId],
-        (err) => {
-            if (err) {
-                log('ERROR', req, `Storage update failed for user ${userId}`);
-                return res.status(500).json({ error: 'Db error' });
-            }
-            log('INFO', req, `Updated usage for UserID: ${userId}. Added: ${addGb} GB`);
-            res.json({ success: true });
-        }
-    );
+
+    try {
+        await pool.query(
+            'UPDATE users SET storage_used_gb = storage_used_gb + $1 WHERE id = $2',
+            [addGb, userId]
+        );
+        log('INFO', req, `Updated usage for UserID: ${userId}. Added: ${addGb} GB`);
+        res.json({ success: true });
+    } catch (err) {
+        log('ERROR', req, `Storage update failed for user ${userId}`);
+        res.status(500).json({ error: 'Db error' });
+    }
 });
 
-app.get('/profile', authenticateToken, (req, res) => {
-    db.get('SELECT storage_limit_gb, storage_used_gb, total_online_minutes, chunks_stored FROM users WHERE id = ?', [req.userId], (err, user) => {
-        if (err) {
-            log('ERROR', req, `Profile fetch db error for user ${req.userId}`);
-            return res.status(500).json({ error: 'Db error' });
-        }
+app.get('/profile', authenticateToken, async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT storage_limit_gb, storage_used_gb, total_online_minutes, chunks_stored FROM users WHERE id = $1',
+            [req.userId]
+        );
+        const user = result.rows[0];
+
         if (!user) return res.status(404).json({ error: 'User not found' });
         res.json(user);
-    });
+    } catch (err) {
+        log('ERROR', req, `Profile fetch db error for user ${req.userId}`);
+        res.status(500).json({ error: 'Db error' });
+    }
 });
 
 const PORT = process.env.PORT || 3001;
